@@ -202,23 +202,9 @@ if st.session_state.history:
     chips = "".join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)
     st.markdown(f'<div class="chip-row">{chips}</div>', unsafe_allow_html=True)
 
-col_inp, col_loc = st.columns([3, 1])
-with col_inp:
-    city_typed = st.text_input("", placeholder="Search a city...",
-                                label_visibility="collapsed",
-                                value=st.session_state.city_input)
-with col_loc:
-    if st.button("📍 My Location"):
-        try:
-            loc_data = requests.get("https://ipinfo.io/json", timeout=5).json()
-            detected = loc_data.get("city", "")
-            if detected:
-                st.session_state.city_input = detected
-                st.rerun()
-            else:
-                st.warning("Couldn't detect city.")
-        except Exception:
-            st.warning("Location failed. Try typing your city.")
+city_typed = st.text_input("", placeholder="Search a city...",
+                            label_visibility="collapsed",
+                            value=st.session_state.city_input)
 
 
 # ── Decide what to fetch ──────────────────────────────────────────────────────
