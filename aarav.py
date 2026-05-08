@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="NimbusAI", page_icon="🌤️", layout="centered")
-
 
 # ── All CSS in one clean block ────────────────────────────────────────────────
 st.markdown("""
@@ -280,8 +280,10 @@ if fetch_mode:
         </style>
         """, unsafe_allow_html=True)
 
-        now_time = datetime.now().strftime("%I:%M %p")
-        now_date = datetime.now().strftime("%a, %b %d")
+        tz_str = wx.get("timezone", "UTC")
+        local_now = datetime.now(ZoneInfo(tz_str))
+        now_time = local_now.strftime("%I:%M %p")
+        now_date = local_now.strftime("%a, %b %d")
         hi = round(daily["temperature_2m_max"][0])
         lo = round(daily["temperature_2m_min"][0])
 
@@ -422,7 +424,7 @@ if fetch_mode:
             y_labels += f'<text x="{pad_l-4}" y="{y:.1f}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="rgba(255,255,255,0.55)" font-family="Outfit,sans-serif">{round(v)}</text>'
 
         # Dot at current hour
-        now_hour = datetime.now().hour
+        now_hour = local_now.hour
         dot = f'<circle cx="{tx(now_hour):.1f}" cy="{ty(hourly_temps[now_hour]):.1f}" r="5" fill="white" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>'
         dot_label = f'<text x="{tx(now_hour):.1f}" y="{ty(hourly_temps[now_hour])-10:.1f}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Outfit,sans-serif">{round(hourly_temps[now_hour])}{unit}</text>'
 
@@ -446,7 +448,6 @@ if fetch_mode:
         </div>
         """
         st.markdown(chart_svg, unsafe_allow_html=True)
-
 
         # ── Moon phase + Air Quality ─────────────────────────────────────────
         moon_icon, moon_name = get_moon_phase(datetime.now())
@@ -494,7 +495,6 @@ if fetch_mode:
         """
         import streamlit.components.v1 as components
         components.html(map_html, height=270)
-
 
         st.markdown('<p class="footer">Open-Meteo API • Air Quality API • OpenStreetMap • No API key needed 😄</p>',
                     unsafe_allow_html=True)
