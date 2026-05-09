@@ -418,27 +418,63 @@ unit=st.radio("",["°F","°C"],horizontal=True,label_visibility="collapsed")
 # ── Geolocation ───────────────────────────────────────────────────────────────
 components.html("""
 <div style="margin-bottom:10px;">
-  <button onclick="getLocation()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);
+  <button onclick="getLocation()" id="geo-btn" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);
     border-radius:12px;color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
     padding:6px 16px;cursor:pointer;">📍 Use My Location</button>
   <span id="gs" style="color:rgba(255,255,255,0.6);font-size:12px;margin-left:10px;"></span>
 </div>
 <script>
-function getLocation(){
-  document.getElementById('gs').innerText='Detecting…';
-  navigator.geolocation.getCurrentPosition(function(p){
-    fetch('https://geocoding-api.open-meteo.com/v1/reverse?latitude='+p.coords.latitude+'&longitude='+p.coords.longitude+'&count=1')
-    .then(r=>r.json()).then(d=>{
-      if(d.results&&d.results[0]){
-        var c=d.results[0].name;
-        document.getElementById('gs').innerText='✅ '+c;
-        var inp=window.parent.document.querySelectorAll('input[type="text"]')[0];
-        if(inp){var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');nv.set.call(inp,c);inp.dispatchEvent(new Event('input',{bubbles:true}));}
-      }
-    });
-  },function(){document.getElementById('gs').innerText='❌ Permission denied';});
+function setCity(name){
+  var inp=window.parent.document.querySelectorAll('input[type="text"]')[0];
+  if(inp){
+    var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
+    nv.set.call(inp,name);
+    inp.dispatchEvent(new Event('input',{bubbles:true}));
+  }
 }
-</script>""",height=50)
+function getLocation(){
+  var btn=document.getElementById('geo-btn');
+  var gs=document.getElementById('gs');
+  btn.disabled=true;
+  btn.innerText='⏳ Detecting…';
+  gs.innerText='';
+
+  // Use maximumAge to return a cached position instantly if available
+  var opts={enableHighAccuracy:false, timeout:5000, maximumAge:60000};
+
+  navigator.geolocation.getCurrentPosition(function(p){
+    var lat=p.coords.latitude, lon=p.coords.longitude;
+    gs.innerText='📡 Got location, looking up city…';
+
+    // bigdatacloud is much faster than open-meteo reverse geocode
+    fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+lat+'&longitude='+lon+'&localityLanguage=en')
+    .then(r=>r.json()).then(d=>{
+      var city=d.city||d.locality||d.principalSubdivision||'';
+      if(city){
+        gs.innerText='✅ '+city;
+        btn.innerText='📍 Use My Location';
+        btn.disabled=false;
+        setCity(city);
+      } else {
+        gs.innerText='⚠️ Could not find city name';
+        btn.innerText='📍 Use My Location';
+        btn.disabled=false;
+      }
+    }).catch(function(){
+      gs.innerText='⚠️ Lookup failed, try typing your city';
+      btn.innerText='📍 Use My Location';
+      btn.disabled=false;
+    });
+
+  }, function(err){
+    if(err.code===1) gs.innerText='❌ Permission denied — allow location in browser';
+    else if(err.code===2) gs.innerText='❌ Position unavailable';
+    else gs.innerText='❌ Timed out — try again';
+    btn.innerText='📍 Use My Location';
+    btn.disabled=false;
+  }, opts);
+}
+</script>""",height=60)
 
 if st.session_state.history:
     st.markdown(''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history).__class__.__name__ and
