@@ -164,33 +164,33 @@ def what_to_wear(temp_f, condition, wind_mph):
 
 def outfit_svg(temp_f, cond):
     """Simple SVG figure showing outfit based on temperature."""
-    c=cond.lower()
-    # body color
-    shirt_color="#3b82f6" if temp_f>77 else "#6366f1"
-    # hat
-    hat=""
-    if temp_f>85: hat='<ellipse cx="50" cy="22" rx="18" ry="5" fill="#fbbf24"/><rect x="38" y="10" width="24" height="14" rx="4" fill="#fbbf24"/>'
-    elif temp_f<50: hat='<ellipse cx="50" cy="22" rx="18" ry="6" fill="#7c3aed"/><rect x="36" y="10" width="28" height="14" rx="6" fill="#7c3aed"/><rect x="34" y="20" width="32" height="5" rx="2" fill="#5b21b6"/>'
-    # scarf
-    scarf='<rect x="38" y="52" width="24" height="8" rx="4" fill="#ef4444"/>' if temp_f<45 else ""
-    # umbrella
-    umbrella=""
-    if "rain" in c or "drizzle" in c or "shower" in c:
-        umbrella='<path d="M85 70 Q85 45 110 45 Q135 45 135 70" fill="#6366f1" stroke="white" stroke-width="1.5"/><line x1="110" y1="45" x2="110" y2="85" stroke="#4b5563" stroke-width="2"/><path d="M110 85 Q110 92 104 92" fill="none" stroke="#4b5563" stroke-width="2"/>'
-    # pants/shorts
-    pants_color="#1e40af" if temp_f<68 else "#0ea5e9"
-    pants_h = 35 if temp_f>77 else 50
-    return f"""<svg viewBox="0 0 160 120" xmlns="http://www.w3.org/2000/svg" style="width:130px;height:auto;">
-      {hat}
-      <circle cx="50" cy="35" r="14" fill="#fde68a" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-      <ellipse cx="50" cy="68" rx="16" ry="20" fill="{shirt_color}"/>
-      {scarf}
-      <line x1="34" y1="58" x2="22" y2="78" stroke="{shirt_color}" stroke-width="7" stroke-linecap="round"/>
-      <line x1="66" y1="58" x2="78" y2="78" stroke="{shirt_color}" stroke-width="7" stroke-linecap="round"/>
-      <rect x="36" y="84" width="12" height="{pants_h}" rx="4" fill="{pants_color}"/>
-      <rect x="52" y="84" width="12" height="{pants_h}" rx="4" fill="{pants_color}"/>
-      {umbrella}
-    </svg>"""
+    c = cond.lower()
+    shirt_color = "#3b82f6" if temp_f > 77 else "#6366f1"
+    hat = ""
+    if temp_f > 85:
+        hat = '<ellipse cx="50" cy="22" rx="18" ry="5" fill="#fbbf24"/><rect x="38" y="10" width="24" height="14" rx="4" fill="#fbbf24"/>'
+    elif temp_f < 50:
+        hat = '<ellipse cx="50" cy="22" rx="18" ry="6" fill="#7c3aed"/><rect x="36" y="10" width="28" height="14" rx="6" fill="#7c3aed"/><rect x="34" y="20" width="32" height="5" rx="2" fill="#5b21b6"/>'
+    scarf = '<rect x="38" y="52" width="24" height="8" rx="4" fill="#ef4444"/>' if temp_f < 45 else ""
+    umbrella = ""
+    if any(x in c for x in ["rain", "drizzle", "shower"]):
+        umbrella = '<path d="M85 70 Q85 45 110 45 Q135 45 135 70" fill="#6366f1" stroke="white" stroke-width="1.5"/><line x1="110" y1="45" x2="110" y2="85" stroke="#4b5563" stroke-width="2"/><path d="M110 85 Q110 92 104 92" fill="none" stroke="#4b5563" stroke-width="2"/>'
+    pants_color = "#1e40af" if temp_f < 68 else "#0ea5e9"
+    pants_h = 35 if temp_f > 77 else 50
+    return (
+        f'<div style="display:flex;align-items:center;justify-content:center;padding:12px;">'
+        f'<svg viewBox="0 0 160 130" xmlns="http://www.w3.org/2000/svg" style="width:120px;height:auto;">'
+        f'{hat}'
+        f'<circle cx="50" cy="35" r="14" fill="#fde68a" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>'
+        f'<ellipse cx="50" cy="68" rx="16" ry="20" fill="{shirt_color}"/>'
+        f'{scarf}'
+        f'<line x1="34" y1="58" x2="22" y2="78" stroke="{shirt_color}" stroke-width="7" stroke-linecap="round"/>'
+        f'<line x1="66" y1="58" x2="78" y2="78" stroke="{shirt_color}" stroke-width="7" stroke-linecap="round"/>'
+        f'<rect x="36" y="84" width="12" height="{pants_h}" rx="4" fill="{pants_color}"/>'
+        f'<rect x="52" y="84" width="12" height="{pants_h}" rx="4" fill="{pants_color}"/>'
+        f'{umbrella}'
+        f'</svg></div>'
+    )
 
 def ai_comment(temp_f, cond, wind_mph):
     c=cond.lower()
@@ -679,8 +679,19 @@ if fetch_city:
         wear_items=what_to_wear(temp_f,condition_str,wind_mph)
         svg_fig=outfit_svg(temp_f,condition_str)
         wc1,wc2=st.columns([1,2])
-        with wc1: st.markdown(svg_fig,unsafe_allow_html=True)
-        with wc2: st.markdown(f'<div class="wear-box" style="height:100%;"><div class="box-title">👗 What to Wear</div>{"<br>".join(wear_items)}</div>',unsafe_allow_html=True)
+        with wc1:
+            st.markdown(
+                f'<div class="glass-card" style="text-align:center;padding:12px;">'
+                f'<div class="box-title">👤 Outfit Preview</div>'
+                f'{svg_fig}</div>',
+                unsafe_allow_html=True
+            )
+        with wc2:
+            st.markdown(
+                f'<div class="wear-box"><div class="box-title">👗 What to Wear</div>'
+                f'{"<br>".join(wear_items)}</div>',
+                unsafe_allow_html=True
+            )
 
         # Outfit memory
         outfit_key=f"{round(temp_f//10)*10}"
