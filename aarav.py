@@ -68,6 +68,7 @@ section[data-testid="stSidebar"] { background: rgba(255,255,255,0.1) !important;
 .stRadio label, .stRadio div { color: white !important; }
 .stSpinner p { color: white !important; }
 .stToggle label { color: white !important; }
+.stForm { background: transparent !important; border: none !important; }
 </style>
 </div>
 """, unsafe_allow_html=True)
@@ -203,26 +204,26 @@ def get_moon_phase(date):
 
 # ── Rule-based chat bot ───────────────────────────────────────────────────────
 def weather_chat(question, ctx):
-    q         = question.lower()
-    temp_f    = ctx["temp_f"]
-    cond      = ctx["condition"].lower()
-    wind_mph  = ctx["wind_mph"]
-    rain_pct  = ctx["rain_pct"]
-    hi_f      = ctx["hi_f"]
-    lo_f      = ctx["lo_f"]
-    city      = ctx["city"]
-    uv        = ctx["uv"]
-    t_cond    = ctx.get("tomorrow_cond", "").lower()
-    t_hi      = ctx.get("tomorrow_hi_f", hi_f)
-    t_rain    = ctx.get("tomorrow_rain_pct", rain_pct)
-    t_code    = ctx.get("tomorrow_code", 0)
+    q        = question.lower()
+    temp_f   = ctx["temp_f"]
+    cond     = ctx["condition"].lower()
+    wind_mph = ctx["wind_mph"]
+    rain_pct = ctx["rain_pct"]
+    hi_f     = ctx["hi_f"]
+    lo_f     = ctx["lo_f"]
+    city     = ctx["city"]
+    uv       = ctx["uv"]
+    t_cond   = ctx.get("tomorrow_cond", "").lower()
+    t_hi     = ctx.get("tomorrow_hi_f", hi_f)
+    t_rain   = ctx.get("tomorrow_rain_pct", rain_pct)
+    t_code   = ctx.get("tomorrow_code", 0)
 
     if any(w in q for w in ["hik", "trail", "nature walk"]):
         bad  = "thunder" in t_cond or "snow" in t_cond or t_rain > 60
         good = t_rain < 25 and "thunder" not in t_cond
-        if good:   return f"✅ Tomorrow looks great for hiking in {city}! {WMO_CODES.get(t_code,'Nice weather')} with a high of {dual(t_hi)}. Bring water and sunscreen!"
-        elif bad:  return f"❌ I'd skip the hike tomorrow — {t_cond} and {t_rain}% rain chance. Pick another day!"
-        else:      return f"⚠️ Risky for hiking tomorrow — {t_rain}% rain chance. Bring a rain jacket just in case."
+        if good:  return f"✅ Tomorrow looks great for hiking in {city}! {WMO_CODES.get(t_code,'Nice weather')} with a high of {dual(t_hi)}. Bring water and sunscreen!"
+        elif bad: return f"❌ I'd skip the hike tomorrow — {t_cond} and {t_rain}% rain chance. Pick another day!"
+        else:     return f"⚠️ Risky for hiking tomorrow — {t_rain}% rain chance. Bring a rain jacket just in case."
 
     if any(w in q for w in ["umbrella", "rain", "rainy", "raining", "wet"]):
         if rain_pct > 60 or any(x in cond for x in ["rain","drizzle","shower"]):
@@ -265,7 +266,7 @@ def weather_chat(question, ctx):
         elif uv >= 5: return f"🌞 UV index is {uv} — sunscreen is a good idea for extended outdoor time."
         else:         return f"🌤️ UV index only {uv} today — low risk, but SPF never hurts!"
 
-    if any(w in q for w in ["how hot", "how cold", "temperature", "degrees", "temp"]):
+    if any(w in q for w in ["how hot", "how cold", "temperature", "degrees", "temp", "warm"]):
         return f"🌡️ Right now in {city}: {dual(temp_f)}, feels like {dual(ctx['feels_f'])}. High {dual(hi_f)}, low {dual(lo_f)}."
 
     if any(w in q for w in ["wind", "windy", "breezy", "gusty"]):
@@ -289,7 +290,7 @@ def weather_chat(question, ctx):
 
     return (f"🤖 Here's what I know: it's {dual(temp_f)} in {city} with {cond}. "
             f"High {dual(hi_f)}, low {dual(lo_f)}, {rain_pct}% rain chance. "
-            f"Try asking: hiking, umbrella, jacket, beach, run, picnic, UV, wind, or driving!")
+            f"Try asking about: hiking, umbrella, jacket, beach, running, picnic, UV, wind, or driving!")
 
 # ── Session state ─────────────────────────────────────────────────────────────
 for key, default in [("history",[]), ("city_input",""), ("chat_messages",[]),
@@ -317,7 +318,7 @@ unit = st.radio("", ["°F", "°C"], horizontal=True, label_visibility="collapsed
 
 # ── Geolocation button ────────────────────────────────────────────────────────
 import streamlit.components.v1 as components
-geo_html = """
+components.html("""
 <div style="margin-bottom:10px;">
   <button onclick="getLocation()" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);
     border-radius:12px;color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
@@ -343,8 +344,7 @@ function getLocation() {
       });
   }, function(){ document.getElementById('geo-status').innerText = '❌ Permission denied'; });
 }
-</script>"""
-components.html(geo_html, height=50)
+</script>""", height=50)
 
 if st.session_state.history:
     chips = "".join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)
@@ -361,10 +361,10 @@ if fetch_city:
         if "results" not in geo or not geo["results"]:
             st.error("❌ City not found! Try a different spelling.")
             st.stop()
-        r = geo["results"][0]
-        lat, lon      = r["latitude"], r["longitude"]
-        city_name     = r["name"]
-        country       = r.get("country", "")
+        r         = geo["results"][0]
+        lat, lon  = r["latitude"], r["longitude"]
+        city_name = r["name"]
+        country   = r.get("country", "")
 
         wx_f = requests.get(
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
@@ -416,10 +416,10 @@ if fetch_city:
         hi_f          = daily_f["temperature_2m_max"][0]
         lo_f          = daily_f["temperature_2m_min"][0]
 
-        t_code  = daily_f["weather_code"][1]               if len(daily_f["weather_code"]) > 1       else code
-        t_hi_f  = daily_f["temperature_2m_max"][1]         if len(daily_f["temperature_2m_max"]) > 1 else hi_f
+        t_code     = daily_f["weather_code"][1]           if len(daily_f["weather_code"]) > 1       else code
+        t_hi_f     = daily_f["temperature_2m_max"][1]     if len(daily_f["temperature_2m_max"]) > 1 else hi_f
         t_rain_arr = daily_f.get("precipitation_probability_max", [rain_pct]*6)
-        t_rain  = t_rain_arr[1] if len(t_rain_arr) > 1 else rain_pct
+        t_rain     = t_rain_arr[1] if len(t_rain_arr) > 1 else rain_pct
 
         st.session_state.weather_ctx = {
             "temp_f": temp_f, "feels_f": feels_f, "condition": condition_str,
@@ -582,7 +582,7 @@ if fetch_city:
             <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌇 Sunset</div><div class="glass-value">{ss}</div></div>
         </div>""", unsafe_allow_html=True)
 
-        # ── Shared SVG chart setup ────────────────────────────────────────────
+        # ── Shared chart helpers ──────────────────────────────────────────────
         hourly_temps = wx_display["hourly"]["temperature_2m"][:24]
         hourly_times = wx_f["hourly"]["time"][:24]
         hourly_rain  = wx_f["hourly"]["precipitation_probability"][:24]
@@ -591,15 +591,14 @@ if fetch_city:
         W, H = 680, 160
         PL, PR, PT, PB = 36, 10, 16, 32
         CW, CH = W-PL-PR, H-PT-PB
+        now_h = local_now.hour
 
-        def tx(i): return PL + (i/(len(hourly_temps)-1))*CW
-        def ty(v, mn, mx): return PT + CH - ((v-mn)/(mx-mn or 1))*CH
+        def tx(i): return PL + (i / (len(hourly_temps)-1)) * CW
+        def ty(v, mn, mx): return PT + CH - ((v - mn) / (mx - mn or 1)) * CH
 
         x_labels = "".join(
             f'<text x="{tx(i):.1f}" y="{PT+CH+18}" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" font-family="Outfit,sans-serif">{hour_labels[i]}</text>'
-            for i in range(0,24,3))
-
-        now_h = local_now.hour
+            for i in range(0, 24, 3))
 
         # ── Hourly temp chart ─────────────────────────────────────────────────
         t_mn = min(hourly_temps)-2; t_mx = max(hourly_temps)+2
@@ -609,7 +608,7 @@ if fetch_city:
                   f" L{tx(23):.1f},{PT+CH} L{tx(0):.1f},{PT+CH} Z")
         t_ylbls = "".join(
             f'<text x="{PL-4}" y="{ty(v,t_mn,t_mx):.1f}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="rgba(255,255,255,0.55)" font-family="Outfit,sans-serif">{round(v)}{unit}</text>'
-            for v in [t_mn+2,(t_mn+t_mx)/2,t_mx-2])
+            for v in [t_mn+2, (t_mn+t_mx)/2, t_mx-2])
         t_dot  = f'<circle cx="{tx(now_h):.1f}" cy="{ty(hourly_temps[now_h],t_mn,t_mx):.1f}" r="5" fill="white" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>'
         t_dlbl = f'<text x="{tx(now_h):.1f}" y="{ty(hourly_temps[now_h],t_mn,t_mx)-10:.1f}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Outfit,sans-serif">{round(hourly_temps[now_h])}{unit}</text>'
 
@@ -634,7 +633,7 @@ if fetch_city:
                   f" L{tx(23):.1f},{PT+CH} L{tx(0):.1f},{PT+CH} Z")
         r_ylbls = "".join(
             f'<text x="{PL-4}" y="{ty(v,0,100):.1f}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="rgba(255,255,255,0.55)" font-family="Outfit,sans-serif">{v}%</text>'
-            for v in [0,50,100])
+            for v in [0, 50, 100])
         r_dot  = f'<circle cx="{tx(now_h):.1f}" cy="{ty(hourly_rain[now_h],0,100):.1f}" r="5" fill="white" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>'
         r_dlbl = f'<text x="{tx(now_h):.1f}" y="{ty(hourly_rain[now_h],0,100)-10:.1f}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Outfit,sans-serif">{hourly_rain[now_h]}%</text>'
 
@@ -693,6 +692,7 @@ if st.session_state.weather_ctx:
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:4px;">💬 Ask NimbusAI</p>', unsafe_allow_html=True)
     st.markdown('<p style="color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:12px;">Try: "Should I go hiking tomorrow?" &bull; "Do I need an umbrella?" &bull; "Good day for a run?"</p>', unsafe_allow_html=True)
 
+    # Display chat history
     if st.session_state.chat_messages:
         chat_html = '<div class="chat-container">'
         for msg in st.session_state.chat_messages[-10:]:
@@ -702,14 +702,16 @@ if st.session_state.weather_ctx:
                 chat_html += f'<div class="chat-name-bot">🌤️ NIMBUS</div><div class="chat-msg-bot">{msg["content"]}</div>'
         st.markdown(chat_html + "</div>", unsafe_allow_html=True)
 
-    c1, c2 = st.columns([5,1])
-    with c1:
-        user_q = st.text_input("", placeholder="Ask about the weather...", label_visibility="collapsed", key="chat_input")
-    with c2:
-        send = st.button("Send ➤")
+    # ── Use st.form with clear_on_submit=True so input clears after each send ──
+    with st.form(key="chat_form", clear_on_submit=True):
+        c1, c2 = st.columns([5, 1])
+        with c1:
+            user_q = st.text_input("", placeholder="Ask about the weather...", label_visibility="collapsed")
+        with c2:
+            send = st.form_submit_button("Send ➤")
 
     if send and user_q.strip():
         answer = weather_chat(user_q.strip(), st.session_state.weather_ctx)
-        st.session_state.chat_messages.append({"role":"user",     "content": user_q.strip()})
-        st.session_state.chat_messages.append({"role":"assistant","content": answer})
+        st.session_state.chat_messages.append({"role": "user",      "content": user_q.strip()})
+        st.session_state.chat_messages.append({"role": "assistant", "content": answer})
         st.rerun()
