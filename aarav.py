@@ -317,36 +317,61 @@ def chat_with_ai(messages, ctx):
         return f"⚠️ Connection issue: {str(e)[:60]}. Check your internet and try again."
 
 # ── SVG chart helper ──────────────────────────────────────────────────────────
+_chart_counter = [0]
+
 def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
                fixed_min=None, fixed_max=None, highlight_i=None):
+    # Use a unique ID each call so duplicate gradient IDs don't conflict in the DOM
+    _chart_counter[0] += 1
+    uid = f"{grad_id}_{_chart_counter[0]}"
+
     W,H=680,160; PL,PR,PT,PB=36,10,16,32; CW,CH=W-PL-PR,H-PT-PB
     mn=(fixed_min if fixed_min is not None else min(values)-2)
     mx=(fixed_max if fixed_max is not None else max(values)+2)
     rng=mx-mn or 1
+
     def tx(i): return PL+(i/(len(values)-1))*CW
     def ty(v): return PT+CH-((v-mn)/rng)*CH
+
     pts=" ".join(f"{tx(i):.1f},{ty(v):.1f}" for i,v in enumerate(values))
-    area=(f"M{tx(0):.1f},{ty(values[0]):.1f} "+
-          " ".join(f"L{tx(i):.1f},{ty(v):.1f}" for i,v in enumerate(values))+
-          f" L{tx(len(values)-1):.1f},{PT+CH} L{tx(0):.1f},{PT+CH} Z")
-    xlbls="".join(f'<text x="{tx(i):.1f}" y="{PT+CH+18}" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)" font-family="Outfit,sans-serif">{hour_labels[i]}</text>' for i in range(0,24,3))
-    ylbls="".join(f'<text x="{PL-4}" y="{ty(v):.1f}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="rgba(255,255,255,0.55)" font-family="Outfit,sans-serif">{round(v)}{unit_lbl}</text>' for v in [mn+(mx-mn)*0.1,(mn+mx)/2,mx-(mx-mn)*0.1])
-    dot=f'<circle cx="{tx(now_h):.1f}" cy="{ty(values[now_h]):.1f}" r="5" fill="white" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>'
-    dlbl=f'<text x="{tx(now_h):.1f}" y="{ty(values[now_h])-10:.1f}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Outfit,sans-serif">{round(values[now_h])}{unit_lbl}</text>'
-    # highlight best window
+    area=(f"M{tx(0):.1f},{ty(values[0]):.1f} "
+          +" ".join(f"L{tx(i):.1f},{ty(v):.1f}" for i,v in enumerate(values))
+          +f" L{tx(len(values)-1):.1f},{PT+CH} L{tx(0):.1f},{PT+CH} Z")
+
+    xlbls="".join(
+        f'<text x="{tx(i):.1f}" y="{PT+CH+18}" text-anchor="middle" font-size="10" '
+        f'fill="rgba(255,255,255,0.6)" font-family="Outfit,sans-serif">{hour_labels[i]}</text>'
+        for i in range(0,24,3))
+    ylbls="".join(
+        f'<text x="{PL-4}" y="{ty(v):.1f}" text-anchor="end" dominant-baseline="middle" '
+        f'font-size="10" fill="rgba(255,255,255,0.55)" font-family="Outfit,sans-serif">{round(v)}{unit_lbl}</text>'
+        for v in [mn+(mx-mn)*0.1, (mn+mx)/2, mx-(mx-mn)*0.1])
+
+    dot  = (f'<circle cx="{tx(now_h):.1f}" cy="{ty(values[now_h]):.1f}" r="5" '
+            f'fill="white" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>')
+    dlbl = (f'<text x="{tx(now_h):.1f}" y="{ty(values[now_h])-10:.1f}" '
+            f'text-anchor="middle" font-size="11" fill="white" font-weight="bold" '
+            f'font-family="Outfit,sans-serif">{round(values[now_h])}{unit_lbl}</text>')
+
     hi_rect=""
     if highlight_i is not None:
         x1=tx(highlight_i); x2=tx(min(highlight_i+2,23))
-        hi_rect=f'<rect x="{x1:.1f}" y="{PT}" width="{x2-x1:.1f}" height="{CH}" fill="rgba(255,255,255,0.08)" rx="4"/>'
-    return f"""<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-        <defs><linearGradient id="{grad_id}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="{grad_color}"/>
-            <stop offset="100%" stop-color="rgba(0,0,0,0.01)"/>
-        </linearGradient></defs>
-        {hi_rect}
-        <path d="{area}" fill="url(#{grad_id})"/>
-        <polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-        {xlbls}{ylbls}{dot}{dlbl}</svg>"""
+        hi_rect=(f'<rect x="{x1:.1f}" y="{PT}" width="{x2-x1:.1f}" height="{CH}" '
+                 f'fill="rgba(255,255,255,0.08)" rx="4"/>')
+
+    return (
+        f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
+        f'<defs><linearGradient id="{uid}" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0%" stop-color="{grad_color}"/>'
+        f'<stop offset="100%" stop-color="rgba(0,0,0,0.01)"/>'
+        f'</linearGradient></defs>'
+        f'{hi_rect}'
+        f'<path d="{area}" fill="url(#{uid})"/>'
+        f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2.5" '
+        f'stroke-linejoin="round" stroke-linecap="round"/>'
+        f'{xlbls}{ylbls}{dot}{dlbl}'
+        f'</svg>'
+    )
 
 def make_sparkline(values, color="#4ade80"):
     mn=min(values); mx=max(values); rng=mx-mn or 1
@@ -774,10 +799,29 @@ if fetch_city:
         </div>""",unsafe_allow_html=True)
 
         # ── Charts ────────────────────────────────────────────────────────────
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌡️ Hourly Temperature <span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>{make_chart(hourly_temps_d,"white","ag","rgba(255,255,255,0.25)",unit,now_h,hour_labels,highlight_i=best_i)}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🥵 Hourly Feels Like</div>{make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels)}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌧️ Hourly Rain Probability</div>{make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100)}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;"><div class="box-title">💨 Hourly Wind Speed</div>{make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels)}</div>',unsafe_allow_html=True)
+        chart_temp  = make_chart(hourly_temps_d,"white","ag","rgba(255,255,255,0.25)",unit,now_h,hour_labels,highlight_i=best_i)
+        chart_feels = make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels)
+        chart_rain  = make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100)
+        chart_wind  = make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels)
+
+        st.markdown(
+            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
+            f'<div class="box-title">🌡️ Hourly Temperature '
+            f'<span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>'
+            f'{chart_temp}</div>',
+            unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
+            f'<div class="box-title">🥵 Hourly Feels Like</div>{chart_feels}</div>',
+            unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
+            f'<div class="box-title">🌧️ Hourly Rain Probability</div>{chart_rain}</div>',
+            unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;">'
+            f'<div class="box-title">💨 Hourly Wind Speed</div>{chart_wind}</div>',
+            unsafe_allow_html=True)
 
         # ── Moon + AQI ────────────────────────────────────────────────────────
         pm_text=f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
