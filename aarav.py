@@ -238,11 +238,11 @@ def what_changed_yesterday(today_hi_f, today_lo_f, today_rain, yesterday_hi_f, y
     if abs(rain_diff)>=15: msgs.append(f"{'🌧️ More rain' if rain_diff>0 else '☀️ Less rain'} expected vs yesterday ({abs(rain_diff):.0f}% {'more' if rain_diff>0 else 'less'}).")
     return " ".join(msgs) if msgs else "📅 Very similar conditions to yesterday."
 
-# ── SVG chart ──────────────────────────────────────────────────────────────────
+# ── SVG chart with interactive hover tooltip ───────────────────────────────────
 _chart_counter = [0]
 def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
                fixed_min=None, fixed_max=None, highlight_i=None):
-    _chart_counter[0]+=1; uid=f"{grad_id}_{_chart_counter[0]}"
+    _chart_counter[0]+=1; uid=f"{grad_id}_{_chart_counter[0]}"; cid=f"chart_{uid}"
     W,H=680,160; PL,PR,PT,PB=36,10,16,32; CW,CH=W-PL-PR,H-PT-PB
     mn=(fixed_min if fixed_min is not None else min(values)-2)
     mx=(fixed_max if fixed_max is not None else max(values)+2)
@@ -260,12 +260,69 @@ def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
     if highlight_i is not None:
         x1=tx(highlight_i); x2=tx(min(highlight_i+2,23))
         hi_rect=f'<rect x="{x1:.1f}" y="{PT}" width="{x2-x1:.1f}" height="{CH}" fill="rgba(255,255,255,0.08)" rx="4"/>'
-    return (f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
-            f'<defs><linearGradient id="{uid}" x1="0" y1="0" x2="0" y2="1">'
-            f'<stop offset="0%" stop-color="{grad_color}"/><stop offset="100%" stop-color="rgba(0,0,0,0.01)"/></linearGradient></defs>'
-            f'{hi_rect}<path d="{area}" fill="url(#{uid})"/>'
-            f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
-            f'{xlbls}{ylbls}{dot}{dlbl}</svg>')
+
+    # Build JS data arrays for tooltip
+    xs_js  = "[" + ",".join(f"{tx(i):.1f}" for i in range(len(values))) + "]"
+    ys_js  = "[" + ",".join(f"{ty(v):.1f}" for v in values) + "]"
+    vals_js= "[" + ",".join(str(round(v,1)) for v in values) + "]"
+    labs_js= "[" + ",".join(f'"{l}"' for l in hour_labels) + "]"
+
+    svg = (f'<div id="wrap_{cid}" style="position:relative;width:100%;">'
+           f'<svg id="{cid}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;cursor:crosshair;display:block;">'
+           f'<defs><linearGradient id="{uid}" x1="0" y1="0" x2="0" y2="1">'
+           f'<stop offset="0%" stop-color="{grad_color}"/><stop offset="100%" stop-color="rgba(0,0,0,0.01)"/></linearGradient></defs>'
+           f'<rect x="0" y="0" width="{W}" height="{H}" fill="transparent" id="hit_{cid}"/>'
+           f'{hi_rect}<path d="{area}" fill="url(#{uid})"/>'
+           f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+           f'{xlbls}{ylbls}{dot}{dlbl}'
+           f'<line id="vline_{cid}" x1="0" y1="{PT}" x2="0" y2="{PT+CH}" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-dasharray="4 3" visibility="hidden"/>'
+           f'<circle id="dot_{cid}" cx="0" cy="0" r="5" fill="{color}" stroke="white" stroke-width="2" visibility="hidden"/>'
+           f'<rect id="tbox_{cid}" x="0" y="0" width="90" height="36" rx="8" fill="rgba(0,0,0,0.75)" visibility="hidden"/>'
+           f'<text id="tval_{cid}" x="0" y="0" font-size="12" font-weight="700" fill="white" font-family="Outfit,sans-serif" text-anchor="middle" visibility="hidden"/>'
+           f'<text id="ttime_{cid}" x="0" y="0" font-size="10" fill="rgba(255,255,255,0.7)" font-family="Outfit,sans-serif" text-anchor="middle" visibility="hidden"/>'
+           f'</svg>'
+           f'<script>'
+           f'(function(){{'
+           f'var svg=document.getElementById("{cid}");'
+           f'var xs={xs_js}, ys={ys_js}, vals={vals_js}, labs={labs_js};'
+           f'var vl=document.getElementById("vline_{cid}");'
+           f'var dc=document.getElementById("dot_{cid}");'
+           f'var tb=document.getElementById("tbox_{cid}");'
+           f'var tv=document.getElementById("tval_{cid}");'
+           f'var tt=document.getElementById("ttime_{cid}");'
+           f'var W={W},PL={PL},PR={PR},PT={PT},CH={CH};'
+           f'function getIdx(mx){{'
+           f'  var best=0,bd=999;'
+           f'  for(var i=0;i<xs.length;i++){{var d=Math.abs(xs[i]-mx);if(d<bd){{bd=d;best=i;}}}}'
+           f'  return best;'
+           f'}}'
+           f'svg.addEventListener("mousemove",function(e){{'
+           f'  var r=svg.getBoundingClientRect();'
+           f'  var svgW=r.width,svgH=r.height;'
+           f'  var scaleX=W/svgW;'
+           f'  var mx=(e.clientX-r.left)*scaleX;'
+           f'  var idx=getIdx(mx);'
+           f'  var x=xs[idx],y=ys[idx],v=vals[idx],lab=labs[idx];'
+           f'  vl.setAttribute("x1",x);vl.setAttribute("x2",x);vl.setAttribute("visibility","visible");'
+           f'  dc.setAttribute("cx",x);dc.setAttribute("cy",y);dc.setAttribute("visibility","visible");'
+           f'  var tbw=88,tbh=36,tbx=x-tbw/2,tby=y-tbh-10;'
+           f'  if(tbx<2)tbx=2; if(tbx+tbw>W-2)tbx=W-tbw-2;'
+           f'  if(tby<2)tby=y+12;'
+           f'  tb.setAttribute("x",tbx);tb.setAttribute("y",tby);tb.setAttribute("width",tbw);tb.setAttribute("visibility","visible");'
+           f'  tv.setAttribute("x",tbx+tbw/2);tv.setAttribute("y",tby+14);tv.setAttribute("visibility","visible");tv.textContent=v+"{unit_lbl}";'
+           f'  tt.setAttribute("x",tbx+tbw/2);tt.setAttribute("y",tby+27);tt.setAttribute("visibility","visible");tt.textContent=lab;'
+           f'}}); '
+           f'svg.addEventListener("mouseleave",function(){{'
+           f'  vl.setAttribute("visibility","hidden");'
+           f'  dc.setAttribute("visibility","hidden");'
+           f'  tb.setAttribute("visibility","hidden");'
+           f'  tv.setAttribute("visibility","hidden");'
+           f'  tt.setAttribute("visibility","hidden");'
+           f'}});'
+           f'}})();'
+           f'</script>'
+           f'</div>')
+    return svg
 
 def make_sparkline(values, color="#4ade80"):
     mn=min(values); mx=max(values); rng=mx-mn or 1
