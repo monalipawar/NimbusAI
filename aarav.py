@@ -653,3 +653,529 @@ if fetch_city:
                     st.markdown(f'<div class="ai-box" style="margin-top:8px;">{winner}</div>',unsafe_allow_html=True)
 
         st.markdown('<p class="footer">Open-Meteo API • Air Quality API • OpenStreetMap • No API keys needed 😄</p>',unsafe_allow_html=True)
+
+        # ── All 15 extra features ──────────────────────────────────────────
+        render_rain_countdown(hourly_rain_vals, hour_labels, now_h)
+        activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition_str)
+        render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d)
+        render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h)
+        render_music_mood(condition_str, temp_f, fgi)
+        render_weather_photo(condition_str, city_name)
+        render_aqi_health(aqi_text, pm25)
+        render_historical(lat, lon, unit)
+        render_severe_weather_map(lat, lon, city_name, code)
+        render_trip_planner()
+        render_packing_list()
+        render_weather_diary(city_name, temp_d, unit, condition_str)
+        render_multi_city_dashboard(unit)
+
+# ── Favourites + PWA always visible ───────────────────────────────────────────
+render_favourites()
+inject_pwa()
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 1 — FAVOURITE CITIES (3 slots)
+# ═══════════════════════════════════════════════════════════════
+def render_favourites():
+    if "favourites" not in st.session_state:
+        st.session_state.favourites = []
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">⭐ Favourite Cities</p>', unsafe_allow_html=True)
+    cols = st.columns(3)
+    for i in range(3):
+        with cols[i]:
+            if i < len(st.session_state.favourites):
+                city = st.session_state.favourites[i]
+                st.markdown(f'<div class="chip" style="cursor:pointer;text-align:center;padding:8px;">⭐ {city}</div>', unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("Load", key=f"load_fav_{i}"):
+                        st.session_state.city_input = city
+                        st.rerun()
+                with c2:
+                    if st.button("❌", key=f"del_fav_{i}"):
+                        st.session_state.favourites.pop(i)
+                        st.rerun()
+            else:
+                new_fav = st.text_input("", placeholder=f"City {i+1}...", key=f"fav_input_{i}", label_visibility="collapsed")
+                if st.button("+ Save", key=f"save_fav_{i}") and new_fav.strip():
+                    st.session_state.favourites.append(new_fav.strip())
+                    st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 2 — ACTIVITY WEATHER SCORES
+# ═══════════════════════════════════════════════════════════════
+def activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition):
+    cond = condition.lower()
+    is_raining = any(x in cond for x in ["rain","drizzle","shower","thunder"])
+    is_sunny = "clear" in cond or "mainly clear" in cond
+
+    def score(base): return max(0, min(10, round(base)))
+
+    running  = score(8 - abs(temp_f-60)/8 - rain_pct/25 - max(0,wind_mph-15)/5)
+    cycling  = score(8 - abs(temp_f-65)/8 - rain_pct/20 - max(0,wind_mph-12)/4)
+    hiking   = score(9 - abs(temp_f-65)/7 - rain_pct/20 - max(0,uv-7)*0.5)
+    picnic   = score(9 - abs(temp_f-72)/6 - rain_pct/15 - max(0,wind_mph-10)/4 - max(0,uv-8)*0.4)
+    golf     = score(8 - abs(temp_f-68)/8 - rain_pct/20 - max(0,wind_mph-15)/5)
+    swimming = score(7 + (temp_f-80)/5 - rain_pct/20 - (1 if is_raining else 0)*4)
+    skiing   = score(8 if temp_f < 35 else max(0, 8-(temp_f-35)/5))
+    bbq      = score(9 - abs(temp_f-75)/6 - rain_pct/12 - max(0,wind_mph-12)/4)
+
+    activities = [
+        ("🏃 Running",  running),
+        ("🚴 Cycling",  cycling),
+        ("🥾 Hiking",   hiking),
+        ("🧺 Picnic",   picnic),
+        ("⛳ Golf",     golf),
+        ("🏊 Swimming", swimming),
+        ("⛷️ Skiing",   skiing),
+        ("🔥 BBQ",      bbq),
+    ]
+
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🏅 Activity Weather Scores</p>', unsafe_allow_html=True)
+    cols = st.columns(4)
+    for idx, (name, sc) in enumerate(activities):
+        color = "#4ade80" if sc>=7 else "#facc15" if sc>=4 else "#f87171"
+        with cols[idx % 4]:
+            st.markdown(f"""<div class="glass-card" style="text-align:center;padding:12px 8px;">
+              <div style="font-size:13px;font-weight:600;color:white;margin-bottom:6px;">{name}</div>
+              <div style="font-size:28px;font-weight:900;color:{color};">{sc}/10</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);">{"✅ Great" if sc>=7 else "⚠️ OK" if sc>=4 else "❌ Poor"}</div>
+            </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 3 — WHAT TO PACK (trip packing list)
+# ═══════════════════════════════════════════════════════════════
+def render_packing_list():
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🧳 Trip Packing List</p>', unsafe_allow_html=True)
+    with st.expander("Generate a packing list for your trip"):
+        dest = st.text_input("Destination city", placeholder="e.g. Miami", key="pack_dest")
+        nights = st.slider("How many nights?", 1, 14, 3, key="pack_nights")
+        if st.button("📋 Generate Packing List", key="gen_pack") and dest.strip():
+            with st.spinner("Fetching destination weather..."):
+                result = fetch_weather(dest.strip(), "°F")
+                if result[0] is None:
+                    st.error("City not found.")
+                else:
+                    wx_f, _, _, meta = result
+                    cur = wx_f["current"]
+                    t = cur["temperature_2m"]; c = WMO_CODES.get(cur["weather_code"],""); w = cur["wind_speed_10m"]
+                    cond = c.lower()
+                    pack = ["📋 **Essentials:** Passport/ID, Phone charger, Headphones, Medications"]
+                    pack.append(f"🌡️ **Weather at {meta['name']}:** {dual(t)}, {c}")
+                    if t < 45:   pack += ["🧥 Heavy winter coat","🧤 Gloves + scarf","🥾 Warm boots","🧦 Thermal socks x" + str(nights)]
+                    elif t < 65: pack += ["🧥 Light jacket","👖 Jeans x" + str(max(2,nights//2)),"👟 Closed-toe shoes"]
+                    elif t < 80: pack += ["👕 T-shirts x" + str(nights),"👖 Light pants/shorts","👟 Comfortable sneakers"]
+                    else:        pack += ["🩳 Shorts x" + str(nights),"👕 Light shirts x" + str(nights),"🕶️ Sunglasses","🧴 High SPF sunscreen","🧢 Hat"]
+                    if any(x in cond for x in ["rain","drizzle","shower"]): pack += ["☔ Umbrella","🧥 Waterproof jacket"]
+                    if "snow" in cond: pack += ["❄️ Snow boots","🧣 Scarf","🧤 Gloves"]
+                    if t > 75:   pack += ["💧 Reusable water bottle","🏊 Swimwear"]
+                    pack.append(f"💼 **For {nights} nights:** {nights+1} outfits recommended")
+                    for item in pack:
+                        st.markdown(f'<div class="info-box" style="margin-bottom:6px;">{item}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 4 — HOURLY FEELS-LIKE TABLE
+# ═══════════════════════════════════════════════════════════════
+def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🕐 Hourly Breakdown Table</p>', unsafe_allow_html=True)
+    with st.expander("Show full 24-hour table"):
+        html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+        html += '<tr style="color:rgba(255,255,255,0.6);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">'
+        html += '<th style="padding:6px 10px;text-align:left;">Time</th><th style="padding:6px 10px;">Temp</th><th style="padding:6px 10px;">Feels</th><th style="padding:6px 10px;">Rain %</th><th style="padding:6px 10px;">Wind</th><th style="padding:6px 10px;">Wear</th></tr>'
+        for i in range(24):
+            bg = "rgba(255,255,255,0.12)" if i == now_h else "transparent"
+            t = hourly_temps_d[i]; f = hourly_feels_d[i]; r = hourly_rain_vals[i]; w = hourly_wind[i]
+            wear = "🧥" if t < 50 else "🧶" if t < 65 else "👕" if t < 80 else "🩳"
+            if r > 50: wear += "☔"
+            html += f'<tr style="background:{bg};border-bottom:1px solid rgba(255,255,255,0.06);">'
+            html += f'<td style="padding:6px 10px;color:{"#FCD34D" if i==now_h else "white"};font-weight:{"700" if i==now_h else "400"};">{"▶ " if i==now_h else ""}{hour_labels[i]}</td>'
+            html += f'<td style="padding:6px 10px;text-align:center;color:white;">{round(t)}{unit}</td>'
+            html += f'<td style="padding:6px 10px;text-align:center;color:rgba(255,200,100,0.9);">{round(f)}{unit}</td>'
+            html += f'<td style="padding:6px 10px;text-align:center;color:{"#f87171" if r>60 else "#60a5fa" if r>30 else "rgba(255,255,255,0.6)"};">{r}%</td>'
+            html += f'<td style="padding:6px 10px;text-align:center;color:rgba(200,240,200,0.9);">{round(w)} mph</td>'
+            html += f'<td style="padding:6px 10px;text-align:center;">{wear}</td></tr>'
+        html += '</table></div>'
+        st.markdown(html, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 5 — RAIN COUNTDOWN
+# ═══════════════════════════════════════════════════════════════
+def render_rain_countdown(hourly_rain_vals, hour_labels, now_h):
+    st.markdown("---")
+    # Find next hour where rain > 50%
+    rain_hour = None
+    for i in range(now_h, 24):
+        if hourly_rain_vals[i] > 50:
+            rain_hour = i
+            break
+    # Find when rain stops if currently raining
+    stop_hour = None
+    if hourly_rain_vals[now_h] > 50:
+        for i in range(now_h+1, 24):
+            if hourly_rain_vals[i] <= 30:
+                stop_hour = i
+                break
+
+    if hourly_rain_vals[now_h] > 50:
+        msg = f"🌧️ **It's raining now!**"
+        if stop_hour:
+            hrs = stop_hour - now_h
+            msg += f" Expected to clear around **{hour_labels[stop_hour]}** (~{hrs}h from now)"
+        else:
+            msg += " Rain likely continues through the evening."
+    elif rain_hour:
+        hrs = rain_hour - now_h
+        msg = f"⏱️ **Rain expected in ~{hrs} hour{'s' if hrs>1 else ''}** — around **{hour_labels[rain_hour]}**. Get your umbrella ready!"
+    else:
+        msg = "☀️ **No significant rain expected** for the rest of today."
+
+    st.markdown(f'<div class="ai-box"><div class="box-title">🌧️ Rain Countdown</div>{msg}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 6 — HISTORICAL WEATHER (same day last year)
+# ═══════════════════════════════════════════════════════════════
+def render_historical(lat, lon, unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📜 This Day Last Year</p>', unsafe_allow_html=True)
+    try:
+        yesterday = datetime.now() - timedelta(days=366)
+        date_str = yesterday.strftime("%Y-%m-%d")
+        url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+               f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code"
+               f"&temperature_unit={'fahrenheit' if unit=='°F' else 'celsius'}"
+               f"&timezone=auto&start_date={date_str}&end_date={date_str}")
+        data = requests.get(url, timeout=8).json()
+        if "daily" in data:
+            hi = round(data["daily"]["temperature_2m_max"][0])
+            lo = round(data["daily"]["temperature_2m_min"][0])
+            rain = round(data["daily"].get("precipitation_sum",[0])[0], 1)
+            code_h = data["daily"].get("weather_code",[0])[0]
+            cond_h = WMO_CODES.get(code_h, "Unknown")
+            st.markdown(f"""<div class="glass-card">
+              <div class="box-title">📅 {yesterday.strftime("%B %d, %Y")} — One Year Ago</div>
+              <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;">
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.6);">Condition</div><div style="font-size:15px;color:white;">{cond_h}</div></div>
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.6);">High</div><div style="font-size:15px;color:#f87171;">{hi}{unit}</div></div>
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.6);">Low</div><div style="font-size:15px;color:#60a5fa;">{lo}{unit}</div></div>
+                <div><div style="font-size:11px;color:rgba(255,255,255,0.6);">Rain</div><div style="font-size:15px;color:#93c5fd;">{rain} mm</div></div>
+              </div>
+            </div>""", unsafe_allow_html=True)
+    except:
+        st.markdown('<div class="info-box">📜 Historical data temporarily unavailable.</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 7 — WEATHER PHOTO OF THE DAY (Unsplash)
+# ═══════════════════════════════════════════════════════════════
+def render_weather_photo(condition, city_name):
+    st.markdown("---")
+    cond = condition.lower()
+    if "thunder" in cond:   keyword = "thunderstorm lightning"
+    elif "snow" in cond:    keyword = "snowfall winter"
+    elif "rain" in cond or "drizzle" in cond: keyword = "rain city"
+    elif "fog" in cond:     keyword = "foggy morning"
+    elif "cloud" in cond:   keyword = "cloudy sky"
+    elif "clear" in cond or "sunny" in cond: keyword = "sunny day blue sky"
+    else:                   keyword = "weather sky"
+    # Use Unsplash source (free, no API key)
+    photo_url = f"https://source.unsplash.com/800x400/?{keyword.replace(' ',',')}"
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">📸 Weather Photo — {condition}</div>
+      <img src="{photo_url}" style="width:100%;border-radius:10px;margin-top:6px;object-fit:cover;height:200px;" alt="Weather photo"/>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:6px;">Photo via Unsplash · {keyword}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 8 — AIR QUALITY HEALTH ADVICE
+# ═══════════════════════════════════════════════════════════════
+def render_aqi_health(aqi_text, pm25):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🫁 Air Quality Health Guide</p>', unsafe_allow_html=True)
+
+    try: aqi_num = int(aqi_text.split()[0])
+    except: aqi_num = 50
+
+    if aqi_num <= 50:
+        groups = [("🏃 Runners","✅ Perfect for outdoor runs. No restrictions."),
+                  ("🧒 Children","✅ Safe for outdoor play all day."),
+                  ("🫁 Asthma","✅ Air is clean. Inhaler still recommended as precaution."),
+                  ("👴 Elderly","✅ Safe for all outdoor activities.")]
+    elif aqi_num <= 100:
+        groups = [("🏃 Runners","⚠️ Sensitive runners may want to reduce intensity."),
+                  ("🧒 Children","✅ Generally safe. Watch for eye irritation."),
+                  ("🫁 Asthma","⚠️ Keep rescue inhaler handy. Avoid heavy exertion."),
+                  ("👴 Elderly","⚠️ Limit prolonged outdoor exposure.")]
+    elif aqi_num <= 150:
+        groups = [("🏃 Runners","❌ Move workout indoors. Outdoor running not advised."),
+                  ("🧒 Children","⚠️ Limit outdoor play to short periods."),
+                  ("🫁 Asthma","❌ Stay indoors. Use air purifier if available."),
+                  ("👴 Elderly","❌ Avoid outdoor activity. Keep windows closed.")]
+    else:
+        groups = [("🏃 Runners","🚫 Do not exercise outdoors under any circumstances."),
+                  ("🧒 Children","🚫 Keep children indoors. School outdoor activities should be cancelled."),
+                  ("🫁 Asthma","🚫 Emergency risk. Stay indoors, use purifier, contact doctor if symptoms worsen."),
+                  ("👴 Elderly","🚫 Stay indoors. Serious health risk.")]
+
+    cols = st.columns(2)
+    for i, (group, advice) in enumerate(groups):
+        with cols[i % 2]:
+            st.markdown(f'<div class="glass-card"><div class="box-title">{group}</div><div style="font-size:13px;color:white;">{advice}</div></div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 9 — TRIP WEATHER PLANNER
+# ═══════════════════════════════════════════════════════════════
+def render_trip_planner():
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">✈️ Trip Weather Planner</p>', unsafe_allow_html=True)
+    with st.expander("Plan your trip weather"):
+        dest = st.text_input("Where are you going?", placeholder="e.g. Paris", key="trip_dest")
+        col1, col2 = st.columns(2)
+        with col1: start = st.date_input("Departure date", key="trip_start")
+        with col2: end   = st.date_input("Return date", key="trip_end")
+
+        if st.button("🗺️ Check Trip Weather", key="trip_go") and dest.strip():
+            if end <= start:
+                st.error("Return date must be after departure date.")
+            else:
+                with st.spinner("Fetching trip forecast..."):
+                    geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={dest.strip()}&count=1").json()
+                    if "results" not in geo or not geo["results"]:
+                        st.error("Destination not found.")
+                    else:
+                        r = geo["results"][0]; lat2 = r["latitude"]; lon2 = r["longitude"]
+                        days = (end - start).days + 1
+                        if days > 16: st.warning("⚠️ Forecast only available up to 16 days. Showing first 16 days.")
+                        days = min(days, 16)
+                        wx = requests.get(
+                            f"https://api.open-meteo.com/v1/forecast?latitude={lat2}&longitude={lon2}"
+                            f"&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max"
+                            f"&temperature_unit=fahrenheit&timezone=auto&forecast_days={days}"
+                            f"&start_date={start}"
+                        ).json()
+                        if "daily" not in wx:
+                            st.error("Could not fetch forecast.")
+                        else:
+                            st.markdown(f'<div class="ai-box" style="margin-bottom:10px;"><div class="box-title">✈️ {r["name"]} Trip Forecast</div>Your {days}-day trip weather summary</div>', unsafe_allow_html=True)
+                            fc = '<div class="forecast-row" style="flex-wrap:wrap;">'
+                            for i in range(min(days, len(wx["daily"]["time"]))):
+                                date_str = wx["daily"]["time"][i]
+                                day_label = datetime.strptime(date_str, "%Y-%m-%d").strftime("%b %d")
+                                di = WMO_CODES.get(wx["daily"]["weather_code"][i],"🌡️").split()[0]
+                                dh = round(wx["daily"]["temperature_2m_max"][i])
+                                dl = round(wx["daily"]["temperature_2m_min"][i])
+                                dr = wx["daily"].get("precipitation_probability_max",[0]*days)[i]
+                                fc += (f'<div class="forecast-day" style="min-width:70px;">'
+                                       f'<div class="day-name">{day_label}</div>'
+                                       f'<div class="day-icon">{di}</div>'
+                                       f'<div class="day-hi">{dh}°F</div>'
+                                       f'<div class="day-lo">{dl}°F</div>'
+                                       f'<div style="font-size:10px;color:rgba(255,255,255,0.5);">🌧️{dr}%</div></div>')
+                            st.markdown(fc + "</div>", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 10 — WEATHER-BASED MUSIC MOOD
+# ═══════════════════════════════════════════════════════════════
+def render_music_mood(condition, temp_f, fgi):
+    st.markdown("---")
+    cond = condition.lower()
+    if "thunder" in cond:
+        mood, playlist, emoji = "Dramatic & Intense", "https://open.spotify.com/playlist/37i9dQZF1DWXRqgorJj26U", "⛈️"
+        desc = "Thunderstorms call for epic, cinematic soundtracks."
+    elif "snow" in cond:
+        mood, playlist, emoji = "Cozy & Warm", "https://open.spotify.com/playlist/37i9dQZF1DX6aTaZa0K6VA", "❄️"
+        desc = "Snow day vibes — curl up with hot cocoa and chill music."
+    elif "rain" in cond or "drizzle" in cond:
+        mood, playlist, emoji = "Rainy Day Chill", "https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO", "🌧️"
+        desc = "Perfect rainy day playlist — lofi, jazz, and mellow tunes."
+    elif temp_f > 85:
+        mood, playlist, emoji = "Summer Vibes", "https://open.spotify.com/playlist/37i9dQZF1DX4dyzvuaRJ0n", "🔥"
+        desc = "Hot weather calls for beach beats and summer anthems."
+    elif temp_f < 40:
+        mood, playlist, emoji = "Winter Warmth", "https://open.spotify.com/playlist/37i9dQZF1DX6aTaZa0K6VA", "🥶"
+        desc = "Cold outside — time for acoustic comfort music."
+    elif fgi >= 70:
+        mood, playlist, emoji = "Happy & Energetic", "https://open.spotify.com/playlist/37i9dQZF1DX3rxVfibe1L0", "😄"
+        desc = "Perfect weather deserves perfect upbeat music!"
+    else:
+        mood, playlist, emoji = "Easy Listening", "https://open.spotify.com/playlist/37i9dQZF1DWYmmr74INQlb", "🎵"
+        desc = "Balanced weather, balanced tunes."
+
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🎵 Weather Music Mood</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="font-size:40px;">{emoji}</div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:white;">{mood}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.7);margin:4px 0;">{desc}</div>
+          <a href="{playlist}" target="_blank" style="display:inline-block;background:#1DB954;color:white;
+             text-decoration:none;border-radius:20px;padding:6px 16px;font-size:12px;font-weight:600;margin-top:4px;">
+            ▶ Open in Spotify</a>
+        </div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 11 — MULTI-CITY DASHBOARD
+# ═══════════════════════════════════════════════════════════════
+def render_multi_city_dashboard(unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🌍 Multi-City Dashboard</p>', unsafe_allow_html=True)
+    default_cities = ["New York", "London", "Tokyo", "Sydney", "Paris", "Dubai"]
+    with st.expander("📊 Show world cities weather"):
+        custom = st.text_input("Add your own cities (comma separated)", placeholder="e.g. Mumbai, Toronto, Berlin", key="multi_city_inp")
+        cities = default_cities.copy()
+        if custom.strip():
+            cities = [c.strip() for c in custom.split(",") if c.strip()][:6]
+
+        if st.button("🌍 Load Cities", key="load_multi"):
+            st.session_state.multi_city_data = []
+            with st.spinner("Loading world weather..."):
+                for city in cities[:6]:
+                    try:
+                        res = fetch_weather(city, unit)
+                        if res[0]:
+                            wx_f, wx_d, _, meta = res
+                            cur = wx_f["current"]; cur_d = wx_d["current"]
+                            fgi_v, fgi_l, fgi_c = feel_good_index(cur["temperature_2m"], cur["relative_humidity_2m"], cur["wind_speed_10m"])
+                            st.session_state.multi_city_data.append({
+                                "name": meta["name"], "country": meta["country"],
+                                "temp": round(cur_d["temperature_2m"]), "unit": unit,
+                                "cond": WMO_CODES.get(cur["weather_code"],"🌡️"),
+                                "fgi": fgi_v, "fgi_col": fgi_c,
+                                "rain": cur.get("precipitation_probability", 0),
+                                "wind": round(cur["wind_speed_10m"])
+                            })
+                    except: pass
+
+        if "multi_city_data" in st.session_state and st.session_state.multi_city_data:
+            cols = st.columns(3)
+            for i, city in enumerate(st.session_state.multi_city_data):
+                with cols[i % 3]:
+                    icon = city["cond"].split()[0]
+                    st.markdown(f"""<div class="glass-card" style="text-align:center;padding:12px;">
+                      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);">{city['name']}, {city['country']}</div>
+                      <div style="font-size:30px;margin:4px 0;">{icon}</div>
+                      <div style="font-size:24px;font-weight:900;color:white;">{city['temp']}{city['unit']}</div>
+                      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">{city['cond'].split(' ',1)[1] if ' ' in city['cond'] else city['cond']}</div>
+                      <div style="font-size:11px;color:{city['fgi_col']};margin-top:4px;">😊 {city['fgi']}/100</div>
+                      <div style="font-size:10px;color:rgba(255,255,255,0.5);">🌧️{city['rain']}% 💨{city['wind']}mph</div>
+                    </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 12 — PERSONAL WEATHER DIARY
+# ═══════════════════════════════════════════════════════════════
+def render_weather_diary(city_name, temp_d, unit, condition):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📔 Weather Diary</p>', unsafe_allow_html=True)
+    if "diary" not in st.session_state: st.session_state.diary = []
+    with st.expander("📝 Log today's weather experience"):
+        mood = st.selectbox("How does this weather make you feel?",
+            ["😄 Happy","😊 Content","😐 Neutral","😟 Gloomy","🥶 Too cold","🥵 Too hot","😴 Sleepy","⚡ Energised"],
+            key="diary_mood")
+        note = st.text_area("Add a note (optional)", placeholder="e.g. Perfect day for a walk!", key="diary_note", height=80)
+        if st.button("💾 Save to Diary", key="save_diary"):
+            entry = {
+                "date": datetime.now().strftime("%b %d, %Y %I:%M %p"),
+                "city": city_name, "temp": f"{round(temp_d)}{unit}",
+                "cond": condition, "mood": mood, "note": note
+            }
+            st.session_state.diary.insert(0, entry)
+            st.session_state.diary = st.session_state.diary[:30]
+            st.success("✅ Logged!")
+
+    if st.session_state.diary:
+        st.markdown('<div class="box-title" style="color:rgba(255,255,255,0.6);margin-top:8px;">Recent Entries</div>', unsafe_allow_html=True)
+        for entry in st.session_state.diary[:5]:
+            st.markdown(f"""<div class="glass-card" style="margin-bottom:6px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px;">
+                <span>{entry['date']} · {entry['city']}</span><span>{entry['temp']} · {entry['cond'].split(' ',1)[-1]}</span>
+              </div>
+              <div style="font-size:14px;color:white;">{entry['mood']}</div>
+              {f'<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">{entry["note"]}</div>' if entry['note'] else ''}
+            </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 13 — SEVERE WEATHER MAP (region alerts)
+# ═══════════════════════════════════════════════════════════════
+def render_severe_weather_map(lat, lon, city_name, code):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">⚠️ Regional Weather Map</p>', unsafe_allow_html=True)
+    is_severe = code in SEVERE_CODES
+    alert_color = "#DC2626" if is_severe else "#1D9E75"
+    alert_msg = f"⚠️ SEVERE WEATHER ACTIVE — {WMO_CODES.get(code,'')}" if is_severe else "✅ No severe weather alerts in this region"
+    import streamlit.components.v1 as comp
+    comp.html(f"""
+    <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.25);margin-bottom:8px;">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="smap" style="height:300px;width:100%;"></div>
+    <script>
+      var map=L.map('smap',{{zoomControl:true,scrollWheelZoom:false}}).setView([{lat},{lon}],5);
+      L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap',maxZoom:18}}).addTo(map);
+      L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{{z}}/{{x}}/{{y}}.png?appid=demo',{{opacity:0.4}}).addTo(map);
+      var circle=L.circle([{lat},{lon}],{{color:'{alert_color}',fillColor:'{alert_color}',fillOpacity:0.15,radius:80000}}).addTo(map);
+      var icon=L.divIcon({{html:'<div style="font-size:28px;">{"⚠️" if is_severe else "📍"}</div>',iconSize:[35,35],className:''}});
+      L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b><br>{WMO_CODES.get(code,"")}').openPopup();
+    </script></div>""", height=310)
+    st.markdown(f'<div class="{"warn-box" if is_severe else "info-box"}">{alert_msg}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 14 — PWA MANIFEST (installable app)
+# ═══════════════════════════════════════════════════════════════
+def inject_pwa():
+    st.markdown("""
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTmltYnVzQUkiLCJzaG9ydF9uYW1lIjoiTmltYnVzIiwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiMxYTZlZmYiLCJ0aGVtZV9jb2xvciI6IiMxYTZlZmYiLCJpY29ucyI6W3sic3JjIjoiaHR0cHM6Ly9lbW9qaXBlZGlhLm9yZy9pbWFnZXMvZW1vamlwZWRpYS9ub3JtYWwvc3VuLWJlaGluZC1zbWFsbC1jbG91ZF8yNmY0LWZlMGYucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XX0=">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NimbusAI">
+    <meta name="theme-color" content="#1a6eff">
+    """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 15 — WEATHER STATS SUMMARY CARD
+# ═══════════════════════════════════════════════════════════════
+def render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📊 Complete Weather Stats</p>', unsafe_allow_html=True)
+
+    def rate(val, low_bad, low_ok, hi_ok, hi_bad):
+        if val <= low_bad or val >= hi_bad: return "🔴"
+        if val <= low_ok or val >= hi_ok:  return "🟡"
+        return "🟢"
+
+    stats = [
+        ("🌡️ Temperature",  f"{round(temp_d)}{unit}", rate(temp_f,32,50,85,100)),
+        ("🥵 Feels Like",   f"{round(feels_d)}{unit}", rate(temp_f,32,50,85,100)),
+        ("💧 Humidity",     f"{humidity}%",             rate(humidity,20,30,60,80)),
+        ("💨 Wind Speed",   f"{round(wind_mph)} mph",   rate(wind_mph,0,0,15,30)),
+        ("🌧️ Rain Chance",  f"{rain_pct}%",             rate(rain_pct,0,0,30,70)),
+        ("🌞 UV Index",     f"{round(uv)}/11",          rate(uv,0,0,5,8)),
+        ("😊 Feel-Good",    f"{fgi}/100",               rate(100-fgi,0,0,30,60)),
+        ("💨 Air Quality",  aqi_text.split()[0] if aqi_text != "N/A" else "N/A", "🟢" if "Good" in aqi_text else "🟡" if "Moderate" in aqi_text else "🔴"),
+    ]
+    html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">'
+    for label, val, dot in stats:
+        html += f'<div class="glass-card" style="padding:10px 12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:12px;color:rgba(255,255,255,0.7);">{label}</span><span>{dot}</span></div><div style="font-size:18px;font-weight:700;color:white;margin-top:4px;">{val}</div></div>'
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
