@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import math, random
+
 st.set_page_config(page_title="NimbusAI", page_icon="🌤️", layout="centered")
 
 st.markdown("""
@@ -11,32 +12,32 @@ st.markdown("""
 * { font-family:'Outfit',sans-serif !important; }
 .stApp { background:linear-gradient(160deg,#1a6eff 0%,#38b6ff 55%,#87ceeb 100%) !important; min-height:100vh; transition:background 1.2s ease !important; }
 [data-testid="stAppViewContainer"],[data-testid="stHeader"],[data-testid="stMain"] { background:transparent !important; }
-.hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px; background:rgba(0,0,0,0.15); box-shadow:0 8px 32px rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.25); }
+.hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px; background:rgba(0,0,0,0.30); box-shadow:0 8px 32px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); position:relative; z-index:10; }
 .hero-temp   { font-size:84px; font-weight:900; line-height:1; letter-spacing:-4px; text-shadow:0 4px 20px rgba(0,0,0,0.2); color:white; }
 .hero-city   { font-size:20px; font-weight:600; color:white; margin-bottom:2px; }
 .hero-cond   { font-size:15px; font-weight:300; color:rgba(255,255,255,0.85); }
 .hilo-badge  { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.35); border-radius:30px; padding:5px 14px; font-size:14px; font-weight:600; color:white; margin-right:8px; margin-top:12px; }
-.glass-card  { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); border-radius:16px; padding:16px 18px; color:white; margin-bottom:12px; }
+.glass-card  { background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:16px; padding:16px 18px; color:white; margin-bottom:12px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
 .glass-label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:rgba(255,255,255,0.65); text-transform:uppercase; margin-bottom:4px; }
 .glass-value { font-size:22px; font-weight:700; color:white; }
 .glass-sub   { font-size:12px; color:rgba(255,255,255,0.6); margin-top:2px; }
-.ai-box      { border-radius:16px; padding:16px 20px; font-size:15px; font-weight:500; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.15); color:white; }
-.wear-box    { border-radius:16px; padding:16px 20px; font-size:14px; line-height:1.9; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.12); color:white; }
+.ai-box      { border-radius:16px; padding:16px 20px; font-size:15px; font-weight:500; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.28); color:white; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
+.wear-box    { border-radius:16px; padding:16px 20px; font-size:14px; line-height:1.9; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.28); color:white; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
 .warn-box    { border-radius:16px; padding:16px 20px; background:rgba(180,20,20,0.35); border:1px solid rgba(255,120,120,0.5); color:white; margin-bottom:12px; font-size:14px; }
-.info-box    { border-radius:16px; padding:14px 18px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; font-size:14px; }
+.info-box    { border-radius:16px; padding:14px 18px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; font-size:14px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
 .box-title   { font-size:10px; letter-spacing:1.4px; color:rgba(255,255,255,0.6); font-weight:700; margin-bottom:8px; text-transform:uppercase; }
-.tomorrow-card { border-radius:16px; padding:16px 20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; }
+.tomorrow-card { border-radius:16px; padding:16px 20px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
 .forecast-row  { display:flex; gap:8px; margin-bottom:12px; }
-.forecast-day  { flex:1; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); border-radius:14px; padding:12px 6px; text-align:center; color:white; min-width:52px; }
+.forecast-day  { flex:1; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:12px 6px; text-align:center; color:white; min-width:52px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
 .day-name { font-size:11px; font-weight:700; color:rgba(255,255,255,0.7); margin-bottom:4px; }
 .day-icon { font-size:22px; margin-bottom:4px; }
 .day-hi   { font-size:13px; font-weight:700; color:white; }
 .day-lo   { font-size:11px; color:rgba(255,255,255,0.55); margin-top:2px; }
 .chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
-.chip     { background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.3); border-radius:20px; padding:4px 12px; font-size:12px; color:white; }
+.chip     { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:4px 12px; font-size:12px; color:white; position:relative; z-index:10; }
 .footer   { font-size:11px; color:rgba(255,255,255,0.5); text-align:center; margin-top:8px; }
 .dual-temp { font-size:13px; color:rgba(255,255,255,0.6); font-weight:400; margin-left:6px; }
-.compare-col { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:16px; padding:16px; margin-bottom:12px; }
+.compare-col { background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:16px; padding:16px; margin-bottom:12px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); position:relative; z-index:10; }
 .sparkline-row { display:flex; gap:3px; align-items:flex-end; height:36px; margin-top:6px; }
 .spark-bar { flex:1; border-radius:3px 3px 0 0; min-height:4px; }
 @keyframes float-cloud { 0%{transform:translateX(-120px)} 100%{transform:translateX(110vw)} }
@@ -44,10 +45,14 @@ st.markdown("""
 @keyframes fall-snow   { 0%{transform:translateY(-20px) rotate(0deg);opacity:0.8} 100%{transform:translateY(110vh) rotate(360deg);opacity:0} }
 @keyframes flash       { 0%,90%,100%{opacity:0} 92%,98%{opacity:1} }
 .weather-particles { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; overflow:hidden; }
-.cloud-particle { position:absolute; animation:float-cloud linear infinite; opacity:0.18; }
-.rain-particle  { position:absolute; width:2px; border-radius:2px; background:rgba(200,230,255,0.6); animation:fall-rain linear infinite; }
-.snow-particle  { position:absolute; font-size:14px; animation:fall-snow linear infinite; color:white; }
-.lightning      { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,200,0.15); pointer-events:none; z-index:1; animation:flash 4s infinite; }
+.cloud-particle { position:absolute; animation:float-cloud linear infinite; opacity:0.12; }
+.rain-particle  { position:absolute; width:2px; border-radius:2px; background:rgba(200,230,255,0.5); animation:fall-rain linear infinite; }
+.snow-particle  { position:absolute; font-size:14px; animation:fall-snow linear infinite; color:white; opacity:0.7; }
+.lightning      { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,200,0.1); pointer-events:none; z-index:0; animation:flash 4s infinite; }
+/* Ensure all Streamlit content sits above particles */
+.main .block-container { position:relative; z-index:10; }
+[data-testid="stVerticalBlock"] { position:relative; z-index:10; }
+[data-testid="stHorizontalBlock"] { position:relative; z-index:10; }
 .stTextInput>div>div>input { background:rgba(255,255,255,0.2) !important; border:1px solid rgba(255,255,255,0.35) !important; border-radius:12px !important; color:white !important; font-size:15px !important; }
 .stTextInput>div>div>input::placeholder { color:rgba(255,255,255,0.55) !important; }
 .stTextInput label { color:white !important; }
@@ -1177,5 +1182,4 @@ if fetch_city:
 # ── Favourites + PWA always visible ───────────────────────────────────────────
 render_favourites()
 inject_pwa()
-
 
