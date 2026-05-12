@@ -163,7 +163,6 @@ def what_to_wear(temp_f, condition, wind_mph):
     return items
 
 def outfit_svg(temp_f, cond):
-    """Simple SVG figure showing outfit based on temperature."""
     c = cond.lower()
     shirt_color = "#3b82f6" if temp_f > 77 else "#6366f1"
     hat = ""
@@ -244,7 +243,6 @@ def get_moon_phase(date):
     return "🌘","Waning Crescent"
 
 def best_outdoor_window(hourly_temps_f, hourly_rain, hourly_wind, hour_labels):
-    """Find best 2-hour window to go outside."""
     best_score=-999; best_i=0
     for i in range(22):
         t=hourly_temps_f[i]; r=hourly_rain[i]; w=hourly_wind[i]
@@ -266,7 +264,7 @@ def what_changed_yesterday(today_hi_f, today_lo_f, today_rain, yesterday_hi_f, y
     if abs(rain_diff)>=15: msgs.append(f"{'🌧️ More rain' if rain_diff>0 else '☀️ Less rain'} expected vs yesterday ({abs(rain_diff):.0f}% {'more' if rain_diff>0 else 'less'}).")
     return " ".join(msgs) if msgs else "📅 Very similar conditions to yesterday."
 
-# ── AI Chat using Anthropic API ───────────────────────────────────────────────
+# ── AI Chat using Gemini API (FREE) ──────────────────────────────────────────
 def build_weather_system_prompt(ctx):
     if not ctx: return "You are NimbusAI, a friendly weather assistant."
     return f"""You are NimbusAI, a friendly, knowledgeable, and concise weather assistant built into a weather app.
@@ -294,34 +292,59 @@ If asked about something not weather-related, politely redirect to weather topic
 Always use both °F and °C when mentioning temperatures."""
 
 def chat_with_ai(messages, ctx):
-    """Call Anthropic API for open-ended weather chat."""
+    """Call Gemini API for open-ended weather chat — 100% free, 1500 req/day."""
     system = build_weather_system_prompt(ctx)
-    api_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+
+    if not api_key:
+        return "⚠️ Gemini API key not configured. Add GEMINI_API_KEY to your Streamlit secrets."
+
+    # Build Gemini-format conversation history
+    gemini_messages = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        gemini_messages.append({
+            "role": role,
+            "parts": [{"text": m["content"]}]
+        })
+
+    # Inject system prompt into first user message
+    if gemini_messages and gemini_messages[0]["role"] == "user":
+        gemini_messages[0]["parts"][0]["text"] = (
+            system + "\n\n" + gemini_messages[0]["parts"][0]["text"]
+        )
+    elif not gemini_messages:
+        return "⚠️ No message to send."
+
     try:
         resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
             headers={"Content-Type": "application/json"},
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 400,
-                "system": system,
-                "messages": api_messages
-            },
+            json={"contents": gemini_messages},
             timeout=15
         )
         data = resp.json()
-        if "content" in data and data["content"]:
-            return data["content"][0].get("text","Sorry, I couldn't get a response.")
-        return "⚠️ Sorry, I couldn't reach my AI brain right now. Try again!"
+
+        # Handle API errors gracefully
+        if "error" in data:
+            err = data["error"].get("message", "Unknown error")
+            return f"⚠️ Gemini error: {err[:100]}"
+
+        if "candidates" in data and data["candidates"]:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+        return "⚠️ No response from Gemini. Try again!"
+
+    except requests.exceptions.Timeout:
+        return "⚠️ Gemini took too long to respond. Try again!"
     except Exception as e:
-        return f"⚠️ Connection issue: {str(e)[:60]}. Check your internet and try again."
+        return f"⚠️ Connection issue: {str(e)[:80]}. Check your internet and try again."
 
 # ── SVG chart helper ──────────────────────────────────────────────────────────
 _chart_counter = [0]
 
 def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
                fixed_min=None, fixed_max=None, highlight_i=None):
-    # Use a unique ID each call so duplicate gradient IDs don't conflict in the DOM
     _chart_counter[0] += 1
     uid = f"{grad_id}_{_chart_counter[0]}"
 
@@ -382,7 +405,6 @@ def make_sparkline(values, color="#4ade80"):
     return f'<div class="sparkline-row">{bars}</div>'
 
 def make_sun_arc(now_dt, sunrise_str, sunset_str):
-    """SVG arc showing sun position in the day."""
     try:
         sr=datetime.strptime(sunrise_str,"%I:%M %p"); ss=datetime.strptime(sunset_str,"%I:%M %p")
         now_mins=(now_dt.hour*60+now_dt.minute)
@@ -390,7 +412,6 @@ def make_sun_arc(now_dt, sunrise_str, sunset_str):
         day_len=ss_mins-sr_mins
         if day_len<=0: raise ValueError
         pct=max(0,min(1,(now_mins-sr_mins)/day_len))
-        # arc: x from 20 to 280, y peaks at 20
         cx=20+pct*260
         cy=80-math.sin(pct*math.pi)*55
         is_day=(sr_mins<=now_mins<=ss_mins)
@@ -429,9 +450,6 @@ def fetch_weather(city_name, unit):
     lat,lon=r["latitude"],r["longitude"]
     name=r["name"]; country=r.get("country","")
 
-    # yesterday's date for comparison
-    yesterday=(datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d")
-
     wx_f=requests.get(
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
@@ -469,10 +487,6 @@ for k,v in [("history",[]),("city_input",""),("chat_messages",[]),
              ("outfit_memory",{})]:
     if k not in st.session_state: st.session_state[k]=v
 
-def add_history(name):
-    if name not in st.session_state.history: st.session_state.history.insert(0,name)
-    st.session_state.history=st.session_state.history[:6]
-
 import streamlit.components.v1 as components
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -485,7 +499,7 @@ if st.session_state.dark_mode:
 
 unit=st.radio("",["°F","°C"],horizontal=True,label_visibility="collapsed")
 
-# ── Geolocation (fast) ────────────────────────────────────────────────────────
+# ── Geolocation ───────────────────────────────────────────────────────────────
 components.html("""
 <div style="margin-bottom:10px;">
   <button onclick="getLocation()" id="geo-btn" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);
@@ -553,8 +567,6 @@ if fetch_city:
 
         temp_d=cur_d["temperature_2m"]; feels_d=cur_d["apparent_temperature"]
 
-        # past_days=1 means index 0 = yesterday, index 1 = today
-        # daily arrays: [yesterday, today, tomorrow, ...]
         hi_d=round(daily_d["temperature_2m_max"][1]); lo_d=round(daily_d["temperature_2m_min"][1])
         hi_f_val=daily_f["temperature_2m_max"][1]; lo_f_val=daily_f["temperature_2m_min"][1]
         yest_hi_f=daily_f["temperature_2m_max"][0]; yest_lo_f=daily_f["temperature_2m_min"][0]
@@ -567,7 +579,6 @@ if fetch_city:
         t_hi_d=round(daily_d["temperature_2m_max"][2]) if len(daily_d.get("temperature_2m_max",[]))>2 else hi_d
         t_lo_d=round(daily_d["temperature_2m_min"][2]) if len(daily_d.get("temperature_2m_min",[]))>2 else lo_d
 
-        # sunrise/sunset (index 1 = today with past_days=1)
         try:
             sr_raw=daily_f.get("sunrise",["",""])[1]
             ss_raw=daily_f.get("sunset",["",""])[1]
@@ -579,7 +590,6 @@ if fetch_city:
         local_now=datetime.now(ZoneInfo(tz_str))
         now_h=local_now.hour
 
-        # hourly — with past_days=1, hourly has 48 hours; slice [24:48] for today
         h_slice=slice(24,48)
         hourly_temps_f=wx_f["hourly"]["temperature_2m"][h_slice]
         hourly_feels_f=wx_f["hourly"].get("apparent_temperature",wx_f["hourly"]["temperature_2m"])[h_slice]
@@ -590,15 +600,11 @@ if fetch_city:
         hourly_times=wx_f["hourly"]["time"][h_slice]
         hour_labels=[datetime.strptime(t,"%Y-%m-%dT%H:%M").strftime("%-I%p").lower() for t in hourly_times]
 
-        # weekly sparkline (today onward, indices 1-7)
         week_hi_f=daily_f["temperature_2m_max"][1:7]
         week_lo_f=daily_f["temperature_2m_min"][1:7]
         week_hi_d=daily_d["temperature_2m_max"][1:7]
 
-        # best window
         best_i,best_window_str=best_outdoor_window(hourly_temps_f,hourly_rain_vals,hourly_wind,hour_labels)
-
-        # yesterday comparison
         yesterday_change=what_changed_yesterday(hi_f_val,lo_f_val,t_rain_arr[1] if len(t_rain_arr)>1 else rain_pct,
                                                  yest_hi_f,yest_lo_f,yest_rain,unit)
 
@@ -606,7 +612,6 @@ if fetch_city:
         moon_icon,moon_name=get_moon_phase(datetime.now())
         aqi_text,aqi_color=aqi_label(aqi)
 
-        # Store full context for chat
         st.session_state.weather_ctx={
             "temp_f":temp_f,"feels_f":feels_f,"condition":condition_str,
             "wind_mph":wind_mph,"gusts_mph":gusts_mph,"wind_dir":wind_dir_str,
@@ -624,6 +629,7 @@ if fetch_city:
         sky_bg=sky_class(code)
         st.session_state.last_sky=sky_bg
         st.session_state.last_updated=local_now.strftime("%I:%M %p")
+        add_history=lambda name: (st.session_state.history.insert(0,name) if name not in st.session_state.history else None) or setattr(st.session_state,'history',st.session_state.history[:6])
         add_history(city_name)
         st.markdown(f"<style>.stApp{{background:{SKY_GRADIENTS.get(sky_bg,SKY_GRADIENTS['sky-clear'])} !important;}}</style>",unsafe_allow_html=True)
         st.markdown(make_particles(sky_bg),unsafe_allow_html=True)
@@ -660,19 +666,11 @@ if fetch_city:
         if code in SEVERE_CODES:
             st.markdown(f'<div class="warn-box"><strong>⚠️ SEVERE WEATHER ALERT</strong><br>{SEVERE_MESSAGES.get(code,"Stay safe!")}</div>',unsafe_allow_html=True)
 
-        # ── Yesterday comparison ──────────────────────────────────────────────
         st.markdown(f'<div class="info-box"><div class="box-title">📅 What Changed Since Yesterday</div>{yesterday_change}</div>',unsafe_allow_html=True)
-
-        # ── Best outdoor window ───────────────────────────────────────────────
         st.markdown(f'<div class="ai-box"><div class="box-title">🌟 Best Time to Go Outside</div>{best_window_str}</div>',unsafe_allow_html=True)
-
-        # ── AI summary ────────────────────────────────────────────────────────
         st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{ai_comment(temp_f,condition_str,wind_mph)}</div>',unsafe_allow_html=True)
-
-        # ── Feels-like reason ─────────────────────────────────────────────────
         st.markdown(f'<div class="glass-card"><div class="box-title">🌡️ Why Does It Feel Like That?</div><div style="font-size:14px;color:white;">{feels_like_reason(temp_f,humidity,wind_mph)}</div></div>',unsafe_allow_html=True)
 
-        # ── Tomorrow preview ──────────────────────────────────────────────────
         t_icon=WMO_CODES.get(t_code,"🌡️").split()[0]
         t_cond_str=WMO_CODES.get(t_code,"Unknown")
         t_alt_hi=f"/ {to_c(round(t_hi_f))}°C" if unit=="°F" else f"/ {to_f(t_hi_d)}°F"
@@ -688,7 +686,6 @@ if fetch_city:
           </div>
         </div>""",unsafe_allow_html=True)
 
-        # ── Share ─────────────────────────────────────────────────────────────
         share_text=(f"📍 {city_name}, {country} — {condition_str}\\n"
                     f"🌡️ {round(temp_d)}{unit} (feels {round(feels_d)}{unit})\\n"
                     f"🔴 High {hi_d}{unit}  🔵 Low {lo_d}{unit}\\n"
@@ -700,25 +697,14 @@ if fetch_city:
                  color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
                  padding:8px 20px;cursor:pointer;margin-bottom:14px;">📋 Share Weather</button>""",unsafe_allow_html=True)
 
-        # ── What to wear + outfit SVG ─────────────────────────────────────────
         wear_items=what_to_wear(temp_f,condition_str,wind_mph)
         svg_fig=outfit_svg(temp_f,condition_str)
         wc1,wc2=st.columns([1,2])
         with wc1:
-            st.markdown(
-                f'<div class="glass-card" style="text-align:center;padding:12px;">'
-                f'<div class="box-title">👤 Outfit Preview</div>'
-                f'{svg_fig}</div>',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<div class="glass-card" style="text-align:center;padding:12px;"><div class="box-title">👤 Outfit Preview</div>{svg_fig}</div>',unsafe_allow_html=True)
         with wc2:
-            st.markdown(
-                f'<div class="wear-box"><div class="box-title">👗 What to Wear</div>'
-                f'{"<br>".join(wear_items)}</div>',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'<div class="wear-box"><div class="box-title">👗 What to Wear</div>{"<br>".join(wear_items)}</div>',unsafe_allow_html=True)
 
-        # Outfit memory
         outfit_key=f"{round(temp_f//10)*10}"
         saved=st.session_state.outfit_memory.get(outfit_key)
         with st.expander("💾 Save Your Own Outfit for This Temperature Range"):
@@ -729,7 +715,6 @@ if fetch_city:
         if saved:
             st.markdown(f'<div class="glass-card"><div class="box-title">💡 Your Saved Outfit</div><div style="color:white;font-size:14px;">👕 {saved}</div></div>',unsafe_allow_html=True)
 
-        # ── Feel-good index ───────────────────────────────────────────────────
         st.markdown(f"""<div class="glass-card" style="display:flex;align-items:center;gap:20px;">
           <svg width="80" height="80" viewBox="0 0 80 80">
             <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
@@ -745,11 +730,9 @@ if fetch_city:
           </div>
         </div>""",unsafe_allow_html=True)
 
-        # ── Humidity comfort ──────────────────────────────────────────────────
         hum_msg,hum_col=humidity_comfort(humidity)
         st.markdown(f'<div class="glass-card"><div class="box-title">💧 Humidity Comfort</div><div style="font-size:14px;color:{hum_col};">{hum_msg}</div><div class="glass-sub">{humidity}% relative humidity</div></div>',unsafe_allow_html=True)
 
-        # ── Stats grid ────────────────────────────────────────────────────────
         vis_str=f"{vis_km} km" if vis_km is not None else "N/A"
         c1,c2,c3,c4=st.columns(4)
         for col,(ico,lbl,val,sub) in zip([c1,c2,c3,c4],[
@@ -764,17 +747,15 @@ if fetch_city:
         with c5: st.markdown(f'<div class="glass-card"><div class="glass-label">🌞 UV Index</div><div class="glass-value">{round(uv)}</div><div class="glass-sub">out of 11</div></div>',unsafe_allow_html=True)
         with c6: st.markdown(f'<div class="glass-card"><div class="glass-label">🌬️ Wind Direction</div><div class="glass-value">{wind_dir_str}</div><div class="glass-sub">{round(wind_deg or 0)}°</div></div>',unsafe_allow_html=True)
 
-        # ── Pollen ────────────────────────────────────────────────────────────
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
           <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌾 Grass Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(grass_pollen,"grass")}</div></div>
           <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌳 Tree Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(tree_pollen,"tree")}</div></div>
         </div>""",unsafe_allow_html=True)
 
-        # ── 5-day forecast + weekly sparkline ─────────────────────────────────
         st.markdown('<p style="color:white;font-weight:700;font-size:14px;margin:10px 0 8px;">📅 5-DAY FORECAST</p>',unsafe_allow_html=True)
         fc='<div class="forecast-row">'
         for i in range(5):
-            idx=i+1  # +1 because past_days=1 shifts daily arrays
+            idx=i+1
             dn="Today" if i==0 else datetime.strptime(daily_f["time"][idx],"%Y-%m-%d").strftime("%a")
             di=WMO_CODES.get(daily_f["weather_code"][idx],"🌡️").split()[0]
             dh=round(daily_d["temperature_2m_max"][idx]); dl=round(daily_d["temperature_2m_min"][idx])
@@ -784,13 +765,11 @@ if fetch_city:
             fc+=f'<div class="forecast-day"><div class="day-name">{dn}</div><div class="day-icon">{di}</div><div class="day-hi">{dh}{unit}</div><div class="day-lo">{dl}{unit}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">{dha}/{dla}{au}</div></div>'
         st.markdown(fc+"</div>",unsafe_allow_html=True)
 
-        # Weekly trend sparkline
         trend_up=week_hi_f[-1]>week_hi_f[0]
         trend_label=f"📈 Warming trend this week" if trend_up else f"📉 Cooling trend this week"
         spark_color="#f87171" if trend_up else "#60a5fa"
         st.markdown(f'<div class="glass-card"><div class="box-title">📊 Weekly High Temperature Trend</div>{make_sparkline(week_hi_d,spark_color)}<div class="glass-sub" style="margin-top:6px;">{trend_label}</div></div>',unsafe_allow_html=True)
 
-        # ── Sunrise / Sunset arc ──────────────────────────────────────────────
         st.markdown(make_sun_arc(local_now,sr_fmt,ss_fmt),unsafe_allow_html=True)
 
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
@@ -798,32 +777,16 @@ if fetch_city:
           <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌇 Sunset</div><div class="glass-value">{ss_fmt}</div></div>
         </div>""",unsafe_allow_html=True)
 
-        # ── Charts ────────────────────────────────────────────────────────────
         chart_temp  = make_chart(hourly_temps_d,"white","ag","rgba(255,255,255,0.25)",unit,now_h,hour_labels,highlight_i=best_i)
         chart_feels = make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels)
         chart_rain  = make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100)
         chart_wind  = make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels)
 
-        st.markdown(
-            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
-            f'<div class="box-title">🌡️ Hourly Temperature '
-            f'<span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>'
-            f'{chart_temp}</div>',
-            unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
-            f'<div class="box-title">🥵 Hourly Feels Like</div>{chart_feels}</div>',
-            unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;">'
-            f'<div class="box-title">🌧️ Hourly Rain Probability</div>{chart_rain}</div>',
-            unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;">'
-            f'<div class="box-title">💨 Hourly Wind Speed</div>{chart_wind}</div>',
-            unsafe_allow_html=True)
+        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌡️ Hourly Temperature <span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>{chart_temp}</div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🥵 Hourly Feels Like</div>{chart_feels}</div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌧️ Hourly Rain Probability</div>{chart_rain}</div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;"><div class="box-title">💨 Hourly Wind Speed</div>{chart_wind}</div>',unsafe_allow_html=True)
 
-        # ── Moon + AQI ────────────────────────────────────────────────────────
         pm_text=f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
           <div class="glass-card" style="flex:1;text-align:center;">
@@ -838,7 +801,6 @@ if fetch_city:
           </div>
         </div>""",unsafe_allow_html=True)
 
-        # ── Map ───────────────────────────────────────────────────────────────
         st.markdown('<div class="box-title" style="color:rgba(255,255,255,0.6);margin-bottom:6px;">🗺️ WEATHER MAP</div>',unsafe_allow_html=True)
         components.html(f"""
         <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.25);margin-bottom:12px;">
@@ -853,7 +815,6 @@ if fetch_city:
           L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>').openPopup();
         </script></div>""",height=270)
 
-        # ── City comparison ───────────────────────────────────────────────────
         st.markdown("---")
         st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🆚 Compare With Another City</p>',unsafe_allow_html=True)
         compare_input=st.text_input("",placeholder="Enter another city to compare...",label_visibility="collapsed",key="compare_inp")
@@ -893,15 +854,14 @@ if fetch_city:
                     winner=f"🏆 {city_name} has better weather!" if fgi>fgi2 else (f"🏆 {meta2['name']} has better weather!" if fgi2>fgi else "🤝 Both cities feel about the same!")
                     st.markdown(f'<div class="ai-box" style="margin-top:8px;">{winner}</div>',unsafe_allow_html=True)
 
-        st.markdown('<p class="footer">Open-Meteo API • Air Quality API • OpenStreetMap • Anthropic Claude • No paid API keys needed 😄</p>',unsafe_allow_html=True)
+        st.markdown('<p class="footer">Open-Meteo API • Air Quality API • OpenStreetMap • Google Gemini AI (Free) • No paid API keys needed 😄</p>',unsafe_allow_html=True)
 
 # ── Chat box ──────────────────────────────────────────────────────────────────
 if st.session_state.weather_ctx:
     st.markdown("---")
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:2px;">💬 Ask NimbusAI Anything</p>',unsafe_allow_html=True)
-    st.markdown('<p style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:10px;">Powered by Claude AI · Ask anything about weather, forecasts, activities, science, climate — anything!</p>',unsafe_allow_html=True)
+    st.markdown('<p style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:10px;">Powered by Gemini AI (Free) · Ask anything about weather, forecasts, activities, science, climate!</p>',unsafe_allow_html=True)
 
-    # Export chat
     if st.session_state.chat_messages:
         export_text="\\n".join(f"{'You' if m['role']=='user' else 'NimbusAI'}: {m['content']}" for m in st.session_state.chat_messages)
         cb1,cb2,cb3=st.columns([4,1,1])
@@ -914,7 +874,6 @@ if st.session_state.weather_ctx:
                 st.session_state.chat_messages=[]
                 st.rerun()
 
-        # Chat history with auto-scroll
         chat_html='<div class="chat-container" id="chat-box">'
         for msg in st.session_state.chat_messages[-16:]:
             if msg["role"]=="user":
@@ -930,9 +889,7 @@ if st.session_state.weather_ctx:
         with fc2: send=st.form_submit_button("Send ➤")
 
     if send and user_q.strip():
-        # Add user message
         st.session_state.chat_messages.append({"role":"user","content":user_q.strip()})
-        # Get AI response
         with st.spinner("NimbusAI is thinking..."):
             answer=chat_with_ai(st.session_state.chat_messages,st.session_state.weather_ctx)
         st.session_state.chat_messages.append({"role":"assistant","content":answer})
