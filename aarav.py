@@ -10,7 +10,7 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <div style="display:none"><style>
 * { font-family:'Outfit',sans-serif !important; }
-.stApp { background:linear-gradient(160deg,#1a6eff 0%,#38b6ff 55%,#87ceeb 100%) !important; min-height:100vh; transition:background 1.2s ease !important; }
+.stApp { background:transparent !important; min-height:100vh; }
 [data-testid="stAppViewContainer"],[data-testid="stHeader"],[data-testid="stMain"] { background:transparent !important; }
 .hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px; background:rgba(0,0,0,0.30); box-shadow:0 8px 32px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); position:relative; z-index:10; }
 .hero-temp   { font-size:84px; font-weight:900; line-height:1; letter-spacing:-4px; text-shadow:0 4px 20px rgba(0,0,0,0.2); color:white; }
@@ -1140,7 +1140,8 @@ if fetch_city:
         st.session_state.last_updated=local_now.strftime("%I:%M %p")
         if city_name not in st.session_state.history: st.session_state.history.insert(0,city_name)
         st.session_state.history=st.session_state.history[:6]
-        st.markdown(make_particles(sky_bg),unsafe_allow_html=True)
+        import streamlit.components.v1 as _cv
+        _cv.html(make_particles(sky_bg), height=0, scrolling=False)
 
         alt_t=f"/ {to_c(temp_f)}°C" if unit=="°F" else f"/ {to_f(temp_d)}°F"
         alt_f2=f"/ {to_c(feels_f)}°C" if unit=="°F" else f"/ {to_f(feels_d)}°F"
@@ -1273,10 +1274,11 @@ if fetch_city:
         chart_feels = make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels)
         chart_rain  = make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100)
         chart_wind  = make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌡️ Hourly Temperature <span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>{chart_temp}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🥵 Hourly Feels Like</div>{chart_feels}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌧️ Hourly Rain Probability</div>{chart_rain}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;"><div class="box-title">💨 Hourly Wind Speed</div>{chart_wind}</div>',unsafe_allow_html=True)
+        import streamlit.components.v1 as _c
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🌡️ Hourly Temperature <span style="font-size:9px;opacity:0.5;">★ shaded = best outdoor window</span></div>{chart_temp}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🥵 Hourly Feels Like</div>{chart_feels}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🌧️ Hourly Rain Probability</div>{chart_rain}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">💨 Hourly Wind Speed</div>{chart_wind}</div>''', height=210, scrolling=False)
 
         pm_text=f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
