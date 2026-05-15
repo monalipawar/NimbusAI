@@ -2,118 +2,121 @@ import streamlit as st
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-import math, random
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from streamlit_autorefresh import st_autorefresh
-import streamlit.components.v1 as components
+import math, random, json
 
 st.set_page_config(page_title="NimbusAI", page_icon="🌤️", layout="centered")
-st_autorefresh(interval=1800000, key="weather_refresh")
+
+# ── URL param city auto-load ────────────────────────────────────────────────
+query_params = st.query_params
+url_city = query_params.get("city", "")
 
 st.markdown("""
-<div style="
-padding:12px 18px;
-margin-bottom:12px;
-border-radius:18px;
-background:rgba(255,255,255,0.12);
-backdrop-filter:blur(14px);
-border:1px solid rgba(255,255,255,0.2);
-color:white;
-font-weight:700;
-text-align:center;
-font-size:18px;
-">
-⚡ NimbusAI ULTRA • Enhanced Visual Edition
-</div>
-
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <div style="display:none"><style>
 * { font-family:'Outfit',sans-serif !important; }
-.stApp { background:linear-gradient(160deg,#1a6eff 0%,#38b6ff 55%,#87ceeb 100%) !important; min-height:100vh; transition:background 1.2s ease !important; }
+.stApp { background:transparent !important; min-height:100vh; }
 [data-testid="stAppViewContainer"],[data-testid="stHeader"],[data-testid="stMain"] { background:transparent !important; }
-.hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px; background:rgba(0,0,0,0.30); box-shadow:0 8px 32px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); position:relative; z-index:10; }
-.hero-temp   {
-        font-size:84px;
-        font-weight:900;
-        line-height:1;
-        letter-spacing:-4px;
-        background:linear-gradient(90deg,#60a5fa,#22c55e,#f97316);
-        -webkit-background-clip:text;
-        -webkit-text-fill-color:transparent;
-        text-shadow:0 4px 20px rgba(0,0,0,0.2);
-        animation: tempGlow 6s ease infinite;
-    }
+.hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px;
+               background:rgba(255,255,255,0.08); box-shadow:0 8px 48px rgba(0,0,0,0.4),0 2px 0 rgba(255,255,255,0.12) inset;
+               border:1px solid rgba(255,255,255,0.22); backdrop-filter:blur(20px) saturate(1.8);
+               -webkit-backdrop-filter:blur(20px) saturate(1.8); position:relative; z-index:10; }
+.hero-temp   { font-size:84px; font-weight:900; line-height:1; letter-spacing:-4px; text-shadow:0 4px 20px rgba(0,0,0,0.3); }
 .hero-city   { font-size:20px; font-weight:600; color:white; margin-bottom:2px; }
 .hero-cond   { font-size:15px; font-weight:300; color:rgba(255,255,255,0.85); }
-.hilo-badge  { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.35); border-radius:30px; padding:5px 14px; font-size:14px; font-weight:600; color:white; margin-right:8px; margin-top:12px; }
-.glass-card  { background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:16px; padding:16px 18px; color:white; margin-bottom:12px; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
-.glass-label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:rgba(255,255,255,0.65); text-transform:uppercase; margin-bottom:4px; }
+.hilo-badge  { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15);
+               border:1px solid rgba(255,255,255,0.3); border-radius:30px; padding:5px 14px;
+               font-size:14px; font-weight:600; color:white; margin-right:8px; margin-top:12px; }
+.glass-card  { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.18);
+               border-radius:16px; padding:16px 18px; color:white; margin-bottom:12px;
+               backdrop-filter:blur(16px) saturate(1.6); -webkit-backdrop-filter:blur(16px) saturate(1.6);
+               box-shadow:0 4px 24px rgba(0,0,0,0.25),0 1px 0 rgba(255,255,255,0.1) inset;
+               position:relative; z-index:10; transition:transform 0.2s,box-shadow 0.2s; }
+.glass-card:hover { transform:translateY(-1px); box-shadow:0 8px 32px rgba(0,0,0,0.35),0 1px 0 rgba(255,255,255,0.12) inset; }
+.glass-label { font-size:11px; font-weight:700; letter-spacing:1.2px; color:rgba(255,255,255,0.55); text-transform:uppercase; margin-bottom:4px; }
 .glass-value { font-size:22px; font-weight:700; color:white; }
-.glass-sub   { font-size:12px; color:rgba(255,255,255,0.6); margin-top:2px; }
-.ai-box      { border-radius:16px; padding:16px 20px; font-size:15px; font-weight:500; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.28); color:white; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
-.wear-box    { border-radius:16px; padding:16px 20px; font-size:14px; line-height:1.9; margin-bottom:12px; border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.28); color:white; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
-.warn-box    { border-radius:16px; padding:16px 20px; background:rgba(180,20,20,0.35); border:1px solid rgba(255,120,120,0.5); color:white; margin-bottom:12px; font-size:14px; }
-.info-box    { border-radius:16px; padding:14px 18px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; font-size:14px; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
-.box-title   { font-size:10px; letter-spacing:1.4px; color:rgba(255,255,255,0.6); font-weight:700; margin-bottom:8px; text-transform:uppercase; }
-.tomorrow-card { border-radius:16px; padding:16px 20px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); color:white; margin-bottom:12px; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
+.glass-sub   { font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
+.ai-box      { border-radius:16px; padding:16px 20px; font-size:15px; font-weight:500; margin-bottom:12px;
+               border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.07); color:white;
+               backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+               box-shadow:0 4px 24px rgba(0,0,0,0.2),0 1px 0 rgba(255,255,255,0.08) inset;
+               position:relative; z-index:10; }
+.wear-box    { border-radius:16px; padding:16px 20px; font-size:14px; line-height:1.9; margin-bottom:12px;
+               border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.07); color:white;
+               backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); position:relative; z-index:10; }
+.warn-box    { border-radius:16px; padding:16px 20px; background:rgba(180,20,20,0.4);
+               border:1px solid rgba(255,120,120,0.5); color:white; margin-bottom:12px;
+               font-size:14px; box-shadow:0 4px 20px rgba(180,20,20,0.3); }
+.info-box    { border-radius:16px; padding:14px 18px; background:rgba(255,255,255,0.07);
+               border:1px solid rgba(255,255,255,0.18); color:white; margin-bottom:12px;
+               font-size:14px; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+               box-shadow:0 4px 20px rgba(0,0,0,0.2); position:relative; z-index:10; }
+.box-title   { font-size:10px; letter-spacing:1.4px; color:rgba(255,255,255,0.55); font-weight:700;
+               margin-bottom:8px; text-transform:uppercase; }
+.tomorrow-card { border-radius:16px; padding:16px 20px; background:rgba(255,255,255,0.07);
+                 border:1px solid rgba(255,255,255,0.18); color:white; margin-bottom:12px;
+                 backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+                 box-shadow:0 4px 24px rgba(0,0,0,0.2); position:relative; z-index:10; }
 .forecast-row  { display:flex; gap:8px; margin-bottom:12px; }
-.forecast-day  { flex:1; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:12px 6px; text-align:center; color:white; min-width:52px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+.forecast-day  { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.18);
+                 border-radius:14px; padding:12px 6px; text-align:center; color:white; min-width:52px;
+                 backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+                 box-shadow:0 2px 12px rgba(0,0,0,0.2); transition:transform 0.2s; }
+.forecast-day:hover { transform:translateY(-2px); }
 .day-name { font-size:11px; font-weight:700; color:rgba(255,255,255,0.7); margin-bottom:4px; }
 .day-icon { font-size:22px; margin-bottom:4px; }
 .day-hi   { font-size:13px; font-weight:700; color:white; }
 .day-lo   { font-size:11px; color:rgba(255,255,255,0.55); margin-top:2px; }
 .chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
-.chip     { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:4px 12px; font-size:12px; color:white; position:relative; z-index:10; }
+.chip     { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22);
+            border-radius:20px; padding:4px 12px; font-size:12px; color:white; position:relative; z-index:10; }
 .footer   { font-size:11px; color:rgba(255,255,255,0.5); text-align:center; margin-top:8px; }
 .dual-temp { font-size:13px; color:rgba(255,255,255,0.6); font-weight:400; margin-left:6px; }
-.compare-col { background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:16px; padding:16px; margin-bottom:12px; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:0 10px 35px rgba(0,0,0,0.25); position:relative; z-index:10; }
+.compare-col { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.18);
+               border-radius:16px; padding:16px; margin-bottom:12px;
+               backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+               box-shadow:0 4px 24px rgba(0,0,0,0.2); position:relative; z-index:10; }
 .sparkline-row { display:flex; gap:3px; align-items:flex-end; height:36px; margin-top:6px; }
 .spark-bar { flex:1; border-radius:3px 3px 0 0; min-height:4px; }
-/* ── NEW: dew point / pressure badges ── */
-.stat-pill { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; color:white; margin:3px 4px 3px 0; }
-/* ── NEW: rain amount bar ── */
-.rain-bar-wrap { height:6px; background:rgba(255,255,255,0.15); border-radius:6px; margin-top:4px; overflow:hidden; }
-.rain-bar-fill { height:6px; border-radius:6px; background:linear-gradient(90deg,#60a5fa,#93c5fd); }
-@keyframes float-cloud { 0%{transform:translateX(-120px)} 100%{transform:translateX(110vw)} }
-@keyframes fall-rain   { 0%{transform:translateY(-20px);opacity:0.7} 100%{transform:translateY(110vh);opacity:0} }
-@keyframes fall-snow   { 0%{transform:translateY(-20px) rotate(0deg);opacity:0.8} 100%{transform:translateY(110vh) rotate(360deg);opacity:0} }
-@keyframes flash       { 0%,90%,100%{opacity:0} 92%,98%{opacity:1} }
-/* ── NEW: pulse dot for live indicator ── */
-@keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:0.5} }
-.live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#4ade80; margin-right:5px; animation:pulse 2s infinite; }
-.weather-particles { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; overflow:hidden; }
-.cloud-particle { position:absolute; animation:float-cloud linear infinite; opacity:0.12; }
-.rain-particle  { position:absolute; width:2px; border-radius:2px; background:rgba(200,230,255,0.5); animation:fall-rain linear infinite; }
-.snow-particle  { position:absolute; font-size:14px; animation:fall-snow linear infinite; color:white; opacity:0.7; }
-.lightning      { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,200,0.1); pointer-events:none; z-index:0; animation:flash 4s infinite; }
-.main .block-container {
-            position:relative;
-            z-index:10;
-            animation:fadeWeather 0.8s ease;
-        }
-
-        @keyframes fadeWeather {
-            from {opacity:0; transform:translateY(12px);}
-            to {opacity:1; transform:translateY(0px);}
-        }
-
-        @keyframes tempGlow {
-            0% { filter:brightness(1); }
-            50% { filter:brightness(1.25); }
-            100% { filter:brightness(1); }
-        }
-[data-testid="stVerticalBlock"] { position:relative; z-index:10; }
-[data-testid="stHorizontalBlock"] { position:relative; z-index:10; }
-.stTextInput>div>div>input { background:rgba(255,255,255,0.2) !important; border:1px solid rgba(255,255,255,0.35) !important; border-radius:12px !important; color:white !important; font-size:15px !important; }
-.stTextInput>div>div>input::placeholder { color:rgba(255,255,255,0.55) !important; }
+/* Dark mode proper card styles */
+.dark-mode-active .glass-card, .dark-mode-active .ai-box, .dark-mode-active .wear-box,
+.dark-mode-active .info-box, .dark-mode-active .tomorrow-card, .dark-mode-active .hero-card,
+.dark-mode-active .forecast-day, .dark-mode-active .compare-col {
+  background:rgba(10,10,20,0.75) !important;
+  border-color:rgba(255,255,255,0.1) !important;
+}
+/* Fade transition */
+@keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.weather-content { animation:fadeIn 0.5s ease-out; }
+/* Autocomplete */
+.autocomplete-box { background:rgba(20,20,40,0.95); border:1px solid rgba(255,255,255,0.25);
+                    border-radius:12px; padding:4px 0; position:relative; z-index:100;
+                    backdrop-filter:blur(20px); margin-top:-8px; margin-bottom:8px; }
+.autocomplete-item { padding:8px 16px; color:white; font-size:14px; cursor:pointer; transition:background 0.15s; }
+.autocomplete-item:hover { background:rgba(255,255,255,0.12); }
+/* UV bar */
+.uv-bar { height:10px; border-radius:5px; background:linear-gradient(90deg,#4ade80,#facc15,#f97316,#dc2626,#9333ea);
+           position:relative; margin:8px 0 4px; }
+.uv-needle { position:absolute; top:-4px; width:4px; height:18px; background:white;
+              border-radius:2px; transform:translateX(-50%);
+              box-shadow:0 0 6px rgba(255,255,255,0.8); }
+/* Postcard */
+.postcard { background:linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05));
+            border:2px solid rgba(255,255,255,0.3); border-radius:16px; padding:20px;
+            position:relative; overflow:hidden; }
+.postcard::before { content:''; position:absolute; right:0; top:0; width:40%; height:100%;
+                     border-left:2px dashed rgba(255,255,255,0.2); }
+.stTextInput>div>div>input { background:rgba(255,255,255,0.12) !important;
+  border:1px solid rgba(255,255,255,0.3) !important; border-radius:12px !important;
+  color:white !important; font-size:15px !important; }
+.stTextInput>div>div>input::placeholder { color:rgba(255,255,255,0.45) !important; }
 .stTextInput label { color:white !important; }
-.stButton>button { background:rgba(255,255,255,0.2) !important; border:1px solid rgba(255,255,255,0.35) !important; border-radius:12px !important; color:white !important; font-weight:600 !important; transition:all 0.2s; }
-.stButton>button:hover { background:rgba(255,255,255,0.32) !important; transform:translateY(-1px); }
+.stButton>button { background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3) !important;
+  border-radius:12px !important; color:white !important; font-weight:600 !important; transition:all 0.2s; }
+.stButton>button:hover { background:rgba(255,255,255,0.28) !important; transform:translateY(-1px); }
 .stRadio label,.stRadio div { color:white !important; }
 .stSpinner p { color:white !important; }
 .stToggle label { color:white !important; }
-.stForm { background:transparent !important; border:none !important; }
-.stExpander { background:rgba(255,255,255,0.1) !important; border:1px solid rgba(255,255,255,0.2) !important; border-radius:12px !important; }
+.stExpander { background:rgba(255,255,255,0.07) !important; border:1px solid rgba(255,255,255,0.18) !important; border-radius:12px !important; }
 .stExpander summary { color:white !important; }
 @media(max-width:600px){ .hero-temp { font-size:56px !important; } .forecast-row { flex-wrap:wrap !important; } .forecast-day { min-width:56px !important; } }
 </style></div>
@@ -165,22 +168,15 @@ def to_c(f): return round((f-32)*5/9)
 def to_f(c): return round(c*9/5+32)
 def dual(f): return f"{round(f)}°F / {to_c(f)}°C"
 
-# NEW: dew point calculation (Magnus formula)
-def dew_point_f(temp_f, humidity):
-    tc = (temp_f - 32) * 5/9
-    a, b = 17.27, 237.7
-    alpha = ((a * tc) / (b + tc)) + math.log(humidity / 100.0)
-    dp_c = (b * alpha) / (a - alpha)
-    return dp_c * 9/5 + 32
-
-# NEW: dew point comfort label
-def dew_point_label(dp_f):
-    if dp_f < 50:  return "🏜️ Very dry"
-    if dp_f < 55:  return "😊 Comfortable"
-    if dp_f < 60:  return "🙂 Pleasant"
-    if dp_f < 65:  return "😐 Noticeable"
-    if dp_f < 70:  return "😓 Humid"
-    return "🥵 Oppressive"
+def temp_color(temp_f):
+    """Returns color from deep-blue (freezing) → green (perfect) → red (hot)"""
+    if temp_f <= 32:   return "#60a5fa"   # icy blue
+    if temp_f <= 50:   return "#93c5fd"   # light blue
+    if temp_f <= 60:   return "#67e8f9"   # cyan
+    if temp_f <= 70:   return "#4ade80"   # green (perfect)
+    if temp_f <= 80:   return "#fde047"   # yellow-warm
+    if temp_f <= 90:   return "#fb923c"   # orange
+    return "#f87171"                       # red/hot
 
 def feel_good_index(temp_f, humidity, wind_mph):
     score=round(max(0,100-abs(temp_f-72)*2.5)*0.5+max(0,100-abs(humidity-45)*1.2)*0.3+max(0,100-max(0,wind_mph-10)*3)*0.2)
@@ -306,6 +302,79 @@ def what_changed_yesterday(today_hi_f, today_lo_f, today_rain, yesterday_hi_f, y
     if abs(rain_diff)>=15: msgs.append(f"{'🌧️ More rain' if rain_diff>0 else '☀️ Less rain'} expected vs yesterday ({abs(rain_diff):.0f}% {'more' if rain_diff>0 else 'less'}).")
     return " ".join(msgs) if msgs else "📅 Very similar conditions to yesterday."
 
+# ── Animated SVG Weather Icons ─────────────────────────────────────────────────
+def animated_weather_icon(code, size=60):
+    """Returns an animated SVG icon based on WMO weather code."""
+    s = size
+    if code == 0:  # Clear / Sunny
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            @keyframes spin {{from{{transform-origin:30px 30px;transform:rotate(0deg)}}to{{transform-origin:30px 30px;transform:rotate(360deg)}}}}
+            @keyframes pulse {{0%,100%{{r:11}}50%{{r:13}}}}
+            .sun-body{{animation:pulse 2.5s ease-in-out infinite}}
+            .sun-rays{{animation:spin 8s linear infinite}}
+          </style>
+          <g class="sun-rays">
+            {"".join(f'<line x1="30" y1="6" x2="30" y2="2" stroke="#FCD34D" stroke-width="2.5" stroke-linecap="round" transform="rotate({i*30} 30 30)"/>' for i in range(12))}
+          </g>
+          <circle class="sun-body" cx="30" cy="30" r="11" fill="#FCD34D"/>
+          <circle cx="30" cy="30" r="8" fill="#FDE68A"/>
+        </svg>'''
+    elif code in {1,2}:  # Mainly clear / partly cloudy
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes floatcloud{{0%,100%{{transform:translateX(0)}}50%{{transform:translateX(3px)}}}}.cld{{animation:floatcloud 3s ease-in-out infinite}}</style>
+          <circle cx="22" cy="26" r="9" fill="#FCD34D"/>
+          {"".join(f'<line x1="22" y1="12" x2="22" y2="9" stroke="#FCD34D" stroke-width="2" stroke-linecap="round" transform="rotate({i*45} 22 26)"/>' for i in range(8))}
+          <g class="cld">
+            <ellipse cx="34" cy="37" rx="14" ry="9" fill="white" opacity="0.9"/>
+            <ellipse cx="24" cy="39" rx="9" ry="7" fill="white" opacity="0.9"/>
+            <ellipse cx="42" cy="40" rx="8" ry="6" fill="white" opacity="0.85"/>
+          </g>
+        </svg>'''
+    elif code == 3:  # Overcast
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes driftcloud{{0%,100%{{transform:translateX(0)}}50%{{transform:translateX(4px)}}}}.dc{{animation:driftcloud 4s ease-in-out infinite}}</style>
+          <g class="dc">
+            <ellipse cx="20" cy="30" rx="12" ry="9" fill="#94A3B8"/>
+            <ellipse cx="33" cy="27" rx="15" ry="10" fill="#94A3B8"/>
+            <ellipse cx="44" cy="32" rx="10" ry="8" fill="#94A3B8"/>
+            <ellipse cx="30" cy="36" rx="18" ry="10" fill="#CBD5E1"/>
+          </g>
+        </svg>'''
+    elif code in {45,48}:  # Fog
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes fogpulse{{0%,100%{{opacity:0.4}}50%{{opacity:0.9}}}}.fl{{animation:fogpulse 2s ease-in-out infinite}}</style>
+          {''.join(f'<rect class="fl" x="8" y="{18+i*8}" width="{40-abs(i-2)*4}" height="3" rx="1.5" fill="#94A3B8" style="animation-delay:{i*0.3}s"/>' for i in range(5))}
+        </svg>'''
+    elif code in {51,53,55,61,63,65,80,81,82}:  # Rain
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes raindrop{{0%{{transform:translateY(-5px);opacity:0}}20%{{opacity:1}}100%{{transform:translateY(20px);opacity:0}}}}.rd{{animation:raindrop 1.2s linear infinite}}</style>
+          <ellipse cx="20" cy="20" rx="12" ry="8" fill="#64748B"/>
+          <ellipse cx="33" cy="17" rx="15" ry="10" fill="#475569"/>
+          <ellipse cx="44" cy="22" rx="10" ry="7" fill="#64748B"/>
+          {''.join(f'<line class="rd" x1="{14+i*8}" y1="34" x2="{12+i*8}" y2="42" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" style="animation-delay:{i*0.2}s"/>' for i in range(5))}
+        </svg>'''
+    elif code in {71,73,75}:  # Snow
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes snowfall{{0%{{transform:translateY(-5px) rotate(0deg);opacity:0}}20%{{opacity:1}}100%{{transform:translateY(22px) rotate(180deg);opacity:0}}}}.sf{{animation:snowfall 2s linear infinite}}</style>
+          <ellipse cx="20" cy="20" rx="12" ry="8" fill="#94A3B8"/>
+          <ellipse cx="33" cy="17" rx="15" ry="10" fill="#7B92AA"/>
+          <ellipse cx="44" cy="22" rx="10" ry="7" fill="#94A3B8"/>
+          {''.join(f'<text class="sf" x="{13+i*9}" y="36" font-size="8" fill="white" style="animation-delay:{i*0.35}s">❄</text>' for i in range(5))}
+        </svg>'''
+    elif code in {95,96,99}:  # Thunderstorm
+        return f'''<svg width="{s}" height="{s}" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+          <style>@keyframes flash{{0%,80%,100%{{opacity:0}}85%,95%{{opacity:1}}}}.bolt{{animation:flash 2s ease-in-out infinite}}</style>
+          <ellipse cx="18" cy="20" rx="13" ry="9" fill="#374151"/>
+          <ellipse cx="32" cy="16" rx="16" ry="11" fill="#1F2937"/>
+          <ellipse cx="45" cy="22" rx="11" ry="8" fill="#374151"/>
+          <ellipse cx="30" cy="28" rx="20" ry="10" fill="#111827"/>
+          <polygon class="bolt" points="33,30 27,42 32,42 28,54 38,38 33,38" fill="#FDE047" filter="url(#glow)"/>
+          <defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        </svg>'''
+    else:
+        return f'<div style="font-size:{s}px;line-height:1;">{WMO_CODES.get(code,"🌡️").split()[0]}</div>'
+
 # ── SVG chart with interactive hover tooltip ───────────────────────────────────
 _chart_counter = [0]
 def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
@@ -346,47 +415,28 @@ def make_chart(values, color, grad_id, grad_color, unit_lbl, now_h, hour_labels,
            f'<text id="tval_{cid}" x="0" y="0" font-size="12" font-weight="700" fill="white" font-family="Outfit,sans-serif" text-anchor="middle" visibility="hidden"/>'
            f'<text id="ttime_{cid}" x="0" y="0" font-size="10" fill="rgba(255,255,255,0.7)" font-family="Outfit,sans-serif" text-anchor="middle" visibility="hidden"/>'
            f'</svg>'
-           f'<script>'
-           f'(function(){{'
+           f'<script>(function(){{'
            f'var svg=document.getElementById("{cid}");'
-           f'var xs={xs_js}, ys={ys_js}, vals={vals_js}, labs={labs_js};'
-           f'var vl=document.getElementById("vline_{cid}");'
-           f'var dc=document.getElementById("dot_{cid}");'
-           f'var tb=document.getElementById("tbox_{cid}");'
-           f'var tv=document.getElementById("tval_{cid}");'
-           f'var tt=document.getElementById("ttime_{cid}");'
+           f'var xs={xs_js},ys={ys_js},vals={vals_js},labs={labs_js};'
+           f'var vl=document.getElementById("vline_{cid}"),dc=document.getElementById("dot_{cid}");'
+           f'var tb=document.getElementById("tbox_{cid}"),tv=document.getElementById("tval_{cid}"),tt=document.getElementById("ttime_{cid}");'
            f'var W={W},PL={PL},PR={PR},PT={PT},CH={CH};'
-           f'function getIdx(mx){{'
-           f'  var best=0,bd=999;'
-           f'  for(var i=0;i<xs.length;i++){{var d=Math.abs(xs[i]-mx);if(d<bd){{bd=d;best=i;}}}}'
-           f'  return best;'
-           f'}}'
+           f'function getIdx(mx){{var best=0,bd=999;for(var i=0;i<xs.length;i++){{var d=Math.abs(xs[i]-mx);if(d<bd){{bd=d;best=i;}}}}return best;}}'
            f'svg.addEventListener("mousemove",function(e){{'
-           f'  var r=svg.getBoundingClientRect();'
-           f'  var svgW=r.width,svgH=r.height;'
-           f'  var scaleX=W/svgW;'
-           f'  var mx=(e.clientX-r.left)*scaleX;'
-           f'  var idx=getIdx(mx);'
+           f'  var r=svg.getBoundingClientRect();var scaleX=W/r.width;var mx=(e.clientX-r.left)*scaleX;var idx=getIdx(mx);'
            f'  var x=xs[idx],y=ys[idx],v=vals[idx],lab=labs[idx];'
            f'  vl.setAttribute("x1",x);vl.setAttribute("x2",x);vl.setAttribute("visibility","visible");'
            f'  dc.setAttribute("cx",x);dc.setAttribute("cy",y);dc.setAttribute("visibility","visible");'
            f'  var tbw=88,tbh=36,tbx=x-tbw/2,tby=y-tbh-10;'
-           f'  if(tbx<2)tbx=2; if(tbx+tbw>W-2)tbx=W-tbw-2;'
-           f'  if(tby<2)tby=y+12;'
+           f'  if(tbx<2)tbx=2;if(tbx+tbw>W-2)tbx=W-tbw-2;if(tby<2)tby=y+12;'
            f'  tb.setAttribute("x",tbx);tb.setAttribute("y",tby);tb.setAttribute("width",tbw);tb.setAttribute("visibility","visible");'
            f'  tv.setAttribute("x",tbx+tbw/2);tv.setAttribute("y",tby+14);tv.setAttribute("visibility","visible");tv.textContent=v+"{unit_lbl}";'
            f'  tt.setAttribute("x",tbx+tbw/2);tt.setAttribute("y",tby+27);tt.setAttribute("visibility","visible");tt.textContent=lab;'
-           f'}}); '
-           f'svg.addEventListener("mouseleave",function(){{'
-           f'  vl.setAttribute("visibility","hidden");'
-           f'  dc.setAttribute("visibility","hidden");'
-           f'  tb.setAttribute("visibility","hidden");'
-           f'  tv.setAttribute("visibility","hidden");'
-           f'  tt.setAttribute("visibility","hidden");'
+           f'}});svg.addEventListener("mouseleave",function(){{'
+           f'  vl.setAttribute("visibility","hidden");dc.setAttribute("visibility","hidden");'
+           f'  tb.setAttribute("visibility","hidden");tv.setAttribute("visibility","hidden");tt.setAttribute("visibility","hidden");'
            f'}});'
-           f'}})();'
-           f'</script>'
-           f'</div>')
+           f'}})();</script></div>')
     return svg
 
 def make_sparkline(values, color="#4ade80"):
@@ -416,95 +466,196 @@ def make_sun_arc(now_dt, sunrise_str, sunset_str):
     except: return ""
 
 def make_particles(sky_bg):
-    p='<div class="weather-particles">'
-    if sky_bg=="sky-clear":
-        for _ in range(4): p+=f'<div class="cloud-particle" style="top:{random.randint(3,35)}%;font-size:{random.randint(32,56)}px;animation-duration:{random.randint(18,35)}s;animation-delay:-{random.randint(0,20)}s;">☁️</div>'
-    elif sky_bg=="sky-rain":
-        for _ in range(40): p+=f'<div class="rain-particle" style="left:{random.randint(0,100)}%;height:{random.randint(12,22)}px;animation-duration:{random.uniform(0.6,1.2):.2f}s;animation-delay:-{random.uniform(0,2):.2f}s;"></div>'
-    elif sky_bg=="sky-snow":
-        for _ in range(30): p+=f'<div class="snow-particle" style="left:{random.randint(0,100)}%;animation-duration:{random.uniform(3,7):.2f}s;animation-delay:-{random.uniform(0,5):.2f}s;">❄️</div>'
-    elif sky_bg=="sky-thunder":
-        p+='<div class="lightning"></div>'
-        for _ in range(25): p+=f'<div class="rain-particle" style="left:{random.randint(0,100)}%;height:{random.randint(15,28)}px;animation-duration:{random.uniform(0.5,0.9):.2f}s;animation-delay:-{random.uniform(0,1.5):.2f}s;background:rgba(180,210,255,0.7);"></div>'
-    return p+'</div>'
+    modes = {
+        "sky-clear":   ("clear",   "#050d1a", "#1a6eff", "#87ceeb"),
+        "sky-cloudy":  ("cloudy",  "#1a2a3a", "#4b5e7a", "#b0c4d8"),
+        "sky-rain":    ("rain",    "#0d1b2a", "#1e3a5f", "#4a7fa8"),
+        "sky-snow":    ("snow",    "#1a2a3a", "#6b8cae", "#ddeeff"),
+        "sky-thunder": ("thunder", "#050510", "#1a1a2e", "#4a3f6b"),
+        "sky-fog":     ("fog",     "#1a2030", "#6b7a8d", "#c5d0d8"),
+    }
+    mode, bg1, bg2, bg3 = modes.get(sky_bg, modes["sky-clear"])
+    return f"""<canvas id="nimbusCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;"></canvas>
+<script>
+(function(){{
+  var C=document.getElementById('nimbusCanvas');
+  if(!C)return;
+  var ctx=C.getContext('2d');
+  var W,H,ps=[],clouds=[],stars=[];
+  var mode='{mode}',bg1='{bg1}',bg2='{bg2}',bg3='{bg3}',t=0;
+  var flashA=0,nextFlash=5000,lastFlash=0;
+  function resize(){{W=C.width=window.innerWidth;H=C.height=window.innerHeight;init();}}
+  function rnd(a,b){{return a+Math.random()*(b-a);}}
+  function mkRain(){{return{{x:rnd(0,W),y:rnd(-H,0),len:rnd(10,25),spd:rnd(12,22),a:rnd(0.3,0.7),w:rnd(0.8,1.8)}};}}
+  function mkSnow(){{return{{x:rnd(0,W),y:rnd(-H,0),r:rnd(2,5),spd:rnd(0.5,2),drift:rnd(-0.6,0.6),a:rnd(0.5,1),wob:rnd(0,6.28),ws:rnd(0.02,0.05)}};}}
+  function mkStar(){{return{{x:rnd(0,W),y:rnd(0,H*0.65),r:rnd(0.4,1.8),a:rnd(0.3,0.9),ts:rnd(0.02,0.06),tp:rnd(0,6.28)}};}}
+  function mkCloud(){{return{{x:rnd(-200,W),y:rnd(20,H*0.45),w:rnd(120,260),h:rnd(40,90),spd:rnd(0.15,0.6),a:rnd(0.08,0.22)}};}}
+  function mkFog(y){{return{{x:0,y:y,h:rnd(80,140),spd:rnd(0.1,0.3),a:rnd(0.04,0.1)}};}}
+  function init(){{
+    ps=[];clouds=[];stars=[];
+    var n={{clear:[0,5,80],cloudy:[0,14,0],rain:[220,9,0],snow:[160,7,0],thunder:[280,12,0],fog:[0,0,0]}}[mode]||[0,5,80];
+    for(var i=0;i<n[0];i++)ps.push(mode==='snow'?mkSnow():mkRain());
+    for(var i=0;i<n[1];i++){{var c=mkCloud();if(mode!=='clear')c.a*=1.6;clouds.push(c);}}
+    for(var i=0;i<n[2];i++)stars.push(mkStar());
+    if(mode==='fog')for(var i=0;i<8;i++)ps.push(mkFog(i*(H/8)));
+  }}
+  function drawBg(){{
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,bg1);g.addColorStop(0.55,bg2);g.addColorStop(1,bg3);
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  }}
+  function drawSun(){{
+    var sx=W*0.76,sy=H*0.17,pulse=1+0.018*Math.sin(t*0.022);
+    for(var r=90;r>=18;r-=14){{ctx.beginPath();ctx.arc(sx,sy,r*pulse,0,6.28);ctx.fillStyle='rgba(255,210,60,'+(0.025+(90-r)*0.0012)+')';ctx.fill();}}
+    var sg=ctx.createRadialGradient(sx,sy,0,sx,sy,24*pulse);
+    sg.addColorStop(0,'#fffde0');sg.addColorStop(0.5,'#FFD700');sg.addColorStop(1,'rgba(255,140,0,0)');
+    ctx.beginPath();ctx.arc(sx,sy,24*pulse,0,6.28);ctx.fillStyle=sg;ctx.fill();
+    ctx.save();ctx.translate(sx,sy);ctx.rotate(t*0.004);
+    for(var i=0;i<12;i++){{ctx.rotate(0.524);ctx.beginPath();ctx.moveTo(28,0);ctx.lineTo(42+4*Math.sin(t*0.06+i),0);ctx.strokeStyle='rgba(255,210,60,0.35)';ctx.lineWidth=2;ctx.stroke();}}
+    ctx.restore();
+  }}
+  function drawMoon(){{
+    var mx=W*0.78,my=H*0.14;
+    var mg=ctx.createRadialGradient(mx,my,0,mx,my,30);
+    mg.addColorStop(0,'rgba(220,230,255,0.95)');mg.addColorStop(0.6,'rgba(180,200,255,0.4)');mg.addColorStop(1,'rgba(100,120,200,0)');
+    ctx.beginPath();ctx.arc(mx,my,30,0,6.28);ctx.fillStyle=mg;ctx.fill();
+    ctx.beginPath();ctx.arc(mx+11,my-4,24,0,6.28);ctx.fillStyle=bg1;ctx.fill();
+  }}
+  function drawAurora(){{
+    ctx.save();ctx.globalAlpha=0.045+0.02*Math.sin(t*0.009);
+    var cols=['rgba(0,255,140,1)','rgba(0,140,255,1)','rgba(160,0,255,1)'];
+    for(var i=0;i<3;i++){{
+      var y0=H*0.28+i*50;
+      var g2=ctx.createLinearGradient(0,y0,0,y0+70);
+      g2.addColorStop(0,'rgba(0,0,0,0)');g2.addColorStop(0.5,cols[i]);g2.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g2;ctx.beginPath();ctx.moveTo(0,y0);
+      for(var x2=0;x2<=W;x2+=16)ctx.lineTo(x2,y0+35*Math.sin(x2/W*9.42+t*0.012+i*1.3));
+      ctx.lineTo(W,y0+70);ctx.lineTo(0,y0+70);ctx.closePath();ctx.fill();
+    }}
+    ctx.restore();
+  }}
+  function drawCloud(c){{
+    ctx.save();ctx.globalAlpha=c.a;
+    var g=ctx.createRadialGradient(c.x+c.w/2,c.y+c.h/2,0,c.x+c.w/2,c.y+c.h/2,c.w*0.65);
+    g.addColorStop(0,'rgba(255,255,255,0.95)');g.addColorStop(1,'rgba(200,220,255,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.ellipse(c.x+c.w*.5,c.y+c.h*.65,c.w*.48,c.h*.38,0,0,6.28);
+    ctx.ellipse(c.x+c.w*.28,c.y+c.h*.42,c.w*.3,c.h*.36,0,0,6.28);
+    ctx.ellipse(c.x+c.w*.68,c.y+c.h*.38,c.w*.26,c.h*.32,0,0,6.28);
+    ctx.fill();ctx.restore();
+  }}
+  function drawStar(s){{
+    s.tp+=s.ts;
+    ctx.save();ctx.globalAlpha=s.a*(0.45+0.55*Math.sin(s.tp));
+    ctx.fillStyle='white';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.28);ctx.fill();ctx.restore();
+  }}
+  function drawLightning(now){{
+    if(mode!=='thunder')return;
+    if(now-lastFlash>nextFlash){{
+      flashA=0.3;lastFlash=now;nextFlash=rnd(4000,10000);
+      ctx.save();ctx.strokeStyle='rgba(200,220,255,0.95)';ctx.lineWidth=2.5;
+      ctx.shadowColor='rgba(150,180,255,1)';ctx.shadowBlur=25;ctx.globalAlpha=0.9;
+      ctx.beginPath();
+      var bx=rnd(W*0.15,W*0.85),by=0;ctx.moveTo(bx,by);
+      while(by<H*0.75){{bx+=rnd(-55,55);by+=rnd(25,50);ctx.lineTo(bx,by);}}
+      ctx.stroke();ctx.restore();
+    }}
+    if(flashA>0.01){{ctx.fillStyle='rgba(180,200,255,'+flashA+')';ctx.fillRect(0,0,W,H);flashA*=0.8;}}
+  }}
+  function animate(now){{
+    t++;ctx.clearRect(0,0,W,H);drawBg();
+    if(mode==='clear'){{
+      var hg=ctx.createLinearGradient(0,H*0.55,0,H);
+      hg.addColorStop(0,'rgba(255,160,60,0)');hg.addColorStop(1,'rgba(255,80,20,0.12)');
+      ctx.fillStyle=hg;ctx.fillRect(0,H*0.55,W,H*0.45);
+    }}
+    if(mode==='clear')drawAurora();
+    stars.forEach(drawStar);
+    if(mode==='clear')drawSun();
+    if(mode==='thunder'||mode==='fog')drawMoon();
+    clouds.forEach(function(c){{drawCloud(c);c.x+=c.spd;if(c.x>W+300){{c.x=-300;c.y=rnd(20,H*0.45);}}}});
+    ps.forEach(function(p,i){{
+      if(mode==='rain'||mode==='thunder'){{
+        ctx.save();ctx.globalAlpha=p.a;ctx.strokeStyle='rgba(180,220,255,0.8)';ctx.lineWidth=p.w;
+        ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-2.5,p.y+p.len);ctx.stroke();ctx.restore();
+        p.y+=p.spd;p.x-=1.5;if(p.y>H){{ps[i]=mkRain();ps[i].y=-15;}}
+      }} else if(mode==='snow'){{
+        ctx.save();ctx.globalAlpha=p.a;ctx.fillStyle='rgba(225,240,255,0.95)';
+        ctx.shadowColor='rgba(200,230,255,0.7)';ctx.shadowBlur=5;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();ctx.restore();
+        p.y+=p.spd;p.wob+=p.ws;p.x+=Math.sin(p.wob)*p.drift;
+        if(p.y>H){{ps[i]=mkSnow();ps[i].y=-10;}}
+        if(p.x<0)p.x=W;if(p.x>W)p.x=0;
+      }} else if(mode==='fog'){{
+        ctx.save();ctx.globalAlpha=p.a*(0.6+0.4*Math.sin(t*0.012+p.y*0.01));
+        var fg=ctx.createLinearGradient(0,p.y,0,p.y+p.h);
+        fg.addColorStop(0,'rgba(200,210,220,0)');fg.addColorStop(0.5,'rgba(200,210,220,1)');fg.addColorStop(1,'rgba(200,210,220,0)');
+        ctx.fillStyle=fg;ctx.fillRect(-W,p.y,W*4,p.h);ctx.restore();
+        p.x-=p.spd;if(p.x<-W)p.x=0;
+      }}
+    }});
+    drawLightning(now);
+    requestAnimationFrame(animate);
+  }}
+  window.addEventListener('resize',resize);
+  resize();
+  requestAnimationFrame(animate);
+}})();
+</script>"""
 
-# ── IMPROVED: Parallel weather fetch (faster loading) ─────────────────────────
+# ── Weather fetch ──────────────────────────────────────────────────────────────
 def fetch_weather(city_name, unit):
-    geo = requests.get(
-        f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1"
-    ).json()
+    geo=requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1",timeout=8).json()
     if "results" not in geo or not geo["results"]: return None,None,None,None
-    r=geo["results"][0]; lat,lon=r["latitude"],r["longitude"]
-    name=r["name"]; country=r.get("country","")
-
-    # Build all 3 URLs
-    url_f = (
+    r=geo["results"][0]; lat,lon=r["latitude"],r["longitude"]; name=r["name"]; country=r.get("country","")
+    wx_f=requests.get(
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
         f"wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,"
-        f"precipitation_probability,uv_index,visibility,surface_pressure"
-        f"&hourly=temperature_2m,apparent_temperature,precipitation_probability,"
-        f"wind_speed_10m,precipitation,dew_point_2m"
+        f"precipitation_probability,uv_index,visibility"
+        f"&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m"
         f"&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,"
         f"precipitation_probability_max,precipitation_sum"
-        f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1"
-    )
-    url_c = (
-        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-        f"&current=temperature_2m,apparent_temperature&hourly=temperature_2m,apparent_temperature"
-        f"&daily=temperature_2m_max,temperature_2m_min"
-        f"&temperature_unit=celsius&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1"
-    )
-    url_aq = (
+        f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1",
+        timeout=10
+    ).json()
+    wx_display=wx_f
+    if unit=="°C":
+        wx_display=requests.get(
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            f"&current=temperature_2m,apparent_temperature&hourly=temperature_2m,apparent_temperature"
+            f"&daily=temperature_2m_max,temperature_2m_min"
+            f"&temperature_unit=celsius&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1",
+            timeout=10
+        ).json()
+    aq=requests.get(
         f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}"
-        f"&current=us_aqi,pm2_5,grass_pollen,tree_pollen"
-    )
+        f"&current=us_aqi,pm2_5,grass_pollen,tree_pollen",
+        timeout=8
+    ).json()
+    return wx_f,wx_display,aq,{"lat":lat,"lon":lon,"name":name,"country":country}
 
-    # Fetch all 3 at the same time instead of one by one
-    def _get(url): return requests.get(url, timeout=10).json()
-    with ThreadPoolExecutor(max_workers=3) as ex:
-        fut_f  = ex.submit(_get, url_f)
-        fut_c  = ex.submit(_get, url_c  if unit=="°C" else url_f)
-        fut_aq = ex.submit(_get, url_aq)
-        wx_f   = fut_f.result()
-        wx_display = fut_c.result()
-        aq     = fut_aq.result()
-
-    return wx_f, wx_display, aq, {"lat":lat,"lon":lon,"name":name,"country":country}
+def fetch_city_suggestions(query):
+    """Get city autocomplete suggestions from geocoding API."""
+    try:
+        r = requests.get(
+            f"https://geocoding-api.open-meteo.com/v1/search?name={query}&count=5&language=en&format=json",
+            timeout=4
+        ).json()
+        return [f"{c['name']}, {c.get('admin1','')}, {c.get('country','')}" for c in r.get("results", [])]
+    except:
+        return []
 
 
 # ═══════════════════════════════════════════════════════════════
-# FEATURE 1 — FAVOURITE CITIES  (now saved to localStorage!)
+# FEATURE 1 — FAVOURITE CITIES (3 slots)
 # ═══════════════════════════════════════════════════════════════
 def render_favourites():
     if "favourites" not in st.session_state:
         st.session_state.favourites = []
     st.markdown("---")
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">⭐ Favourite Cities</p>', unsafe_allow_html=True)
-
-    # JS bridge: load from localStorage on first render, save on change
-    import streamlit.components.v1 as comp
-    comp.html("""
-    <script>
-    // Load saved favourites and push into Streamlit text inputs
-    (function(){
-      var saved = [];
-      try { saved = JSON.parse(localStorage.getItem('nimbus_favs') || '[]'); } catch(e){}
-      saved.forEach(function(city, i){
-        var inputs = window.parent.document.querySelectorAll('input[data-testid="stTextInput"]');
-        // We can't directly set fav inputs here easily, but we expose them via a hidden div
-      });
-      // Expose saved cities to the page
-      var div = document.getElementById('fav_store');
-      if(!div){ div = document.createElement('div'); div.id='fav_store'; div.style.display='none'; document.body.appendChild(div); }
-      div.textContent = JSON.stringify(saved);
-    })();
-    function saveNavFavs(cities){
-      try { localStorage.setItem('nimbus_favs', JSON.stringify(cities)); } catch(e){}
-    }
-    </script>
-    """, height=0)
-
     cols = st.columns(3)
     for i in range(3):
         with cols[i]:
@@ -533,9 +684,7 @@ def render_favourites():
 def activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition):
     cond = condition.lower()
     is_raining = any(x in cond for x in ["rain","drizzle","shower","thunder"])
-
     def score(base): return max(0, min(10, round(base)))
-
     running  = score(8 - abs(temp_f-60)/8 - rain_pct/25 - max(0,wind_mph-15)/5)
     cycling  = score(8 - abs(temp_f-65)/8 - rain_pct/20 - max(0,wind_mph-12)/4)
     hiking   = score(9 - abs(temp_f-65)/7 - rain_pct/20 - max(0,uv-7)*0.5)
@@ -544,18 +693,10 @@ def activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition):
     swimming = score(7 + (temp_f-80)/5 - rain_pct/20 - (1 if is_raining else 0)*4)
     skiing   = score(8 if temp_f < 35 else max(0, 8-(temp_f-35)/5))
     bbq      = score(9 - abs(temp_f-75)/6 - rain_pct/12 - max(0,wind_mph-12)/4)
-
     activities = [
-        ("🏃 Running",  running),
-        ("🚴 Cycling",  cycling),
-        ("🥾 Hiking",   hiking),
-        ("🧺 Picnic",   picnic),
-        ("⛳ Golf",     golf),
-        ("🏊 Swimming", swimming),
-        ("⛷️ Skiing",   skiing),
-        ("🔥 BBQ",      bbq),
+        ("🏃 Running",running),("🚴 Cycling",cycling),("🥾 Hiking",hiking),("🧺 Picnic",picnic),
+        ("⛳ Golf",golf),("🏊 Swimming",swimming),("⛷️ Skiing",skiing),("🔥 BBQ",bbq),
     ]
-
     st.markdown("---")
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🏅 Activity Weather Scores</p>', unsafe_allow_html=True)
     cols = st.columns(4)
@@ -570,7 +711,7 @@ def activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition):
 
 
 # ═══════════════════════════════════════════════════════════════
-# FEATURE 3 — WHAT TO PACK (trip packing list)
+# FEATURE 3 — WHAT TO PACK
 # ═══════════════════════════════════════════════════════════════
 def render_packing_list():
     st.markdown("---")
@@ -605,19 +746,13 @@ def render_packing_list():
 # ═══════════════════════════════════════════════════════════════
 # FEATURE 4 — HOURLY FEELS-LIKE TABLE
 # ═══════════════════════════════════════════════════════════════
-def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals,
-                        hourly_wind, hour_labels, unit, now_h,
-                        hourly_precip_mm=None):
+def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h):
     st.markdown("---")
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🕐 Hourly Breakdown Table</p>', unsafe_allow_html=True)
     with st.expander("Show full 24-hour table"):
         html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
         html += '<tr style="color:rgba(255,255,255,0.6);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">'
-        html += '<th style="padding:6px 10px;text-align:left;">Time</th><th style="padding:6px 10px;">Temp</th><th style="padding:6px 10px;">Feels</th><th style="padding:6px 10px;">Rain %</th>'
-        # NEW column: actual mm
-        if hourly_precip_mm:
-            html += '<th style="padding:6px 10px;">Rain mm</th>'
-        html += '<th style="padding:6px 10px;">Wind</th><th style="padding:6px 10px;">Wear</th></tr>'
+        html += '<th style="padding:6px 10px;text-align:left;">Time</th><th style="padding:6px 10px;">Temp</th><th style="padding:6px 10px;">Feels</th><th style="padding:6px 10px;">Rain %</th><th style="padding:6px 10px;">Wind</th><th style="padding:6px 10px;">Wear</th></tr>'
         for i in range(24):
             bg = "rgba(255,255,255,0.12)" if i == now_h else "transparent"
             t = hourly_temps_d[i]; f = hourly_feels_d[i]; r = hourly_rain_vals[i]; w = hourly_wind[i]
@@ -628,13 +763,6 @@ def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals,
             html += f'<td style="padding:6px 10px;text-align:center;color:white;">{round(t)}{unit}</td>'
             html += f'<td style="padding:6px 10px;text-align:center;color:rgba(255,200,100,0.9);">{round(f)}{unit}</td>'
             html += f'<td style="padding:6px 10px;text-align:center;color:{"#f87171" if r>60 else "#60a5fa" if r>30 else "rgba(255,255,255,0.6)"};">{r}%</td>'
-            if hourly_precip_mm:
-                mm = round(hourly_precip_mm[i], 1)
-                bar_w = min(100, int(mm * 20))
-                html += (f'<td style="padding:6px 10px;text-align:center;">'
-                         f'<div style="font-size:11px;color:#93c5fd;">{mm}mm</div>'
-                         f'<div class="rain-bar-wrap"><div class="rain-bar-fill" style="width:{bar_w}%;"></div></div>'
-                         f'</td>')
             html += f'<td style="padding:6px 10px;text-align:center;color:rgba(200,240,200,0.9);">{round(w)} mph</td>'
             html += f'<td style="padding:6px 10px;text-align:center;">{wear}</td></tr>'
         html += '</table></div>'
@@ -673,7 +801,7 @@ def render_rain_countdown(hourly_rain_vals, hour_labels, now_h):
 
 
 # ═══════════════════════════════════════════════════════════════
-# FEATURE 6 — HISTORICAL WEATHER (same day last year)
+# FEATURE 6 — HISTORICAL WEATHER
 # ═══════════════════════════════════════════════════════════════
 def render_historical(lat, lon, unit):
     st.markdown("---")
@@ -706,7 +834,7 @@ def render_historical(lat, lon, unit):
 
 
 # ═══════════════════════════════════════════════════════════════
-# FEATURE 7 — WEATHER PHOTO OF THE DAY (Unsplash)
+# FEATURE 7 — WEATHER PHOTO OF THE DAY
 # ═══════════════════════════════════════════════════════════════
 def render_weather_photo(condition, city_name):
     st.markdown("---")
@@ -776,7 +904,7 @@ def render_trip_planner():
                 st.error("Return date must be after departure date.")
             else:
                 with st.spinner("Fetching trip forecast..."):
-                    geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={dest.strip()}&count=1").json()
+                    geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={dest.strip()}&count=1",timeout=8).json()
                     if "results" not in geo or not geo["results"]:
                         st.error("Destination not found.")
                     else:
@@ -787,13 +915,11 @@ def render_trip_planner():
                         wx = requests.get(
                             f"https://api.open-meteo.com/v1/forecast?latitude={lat2}&longitude={lon2}"
                             f"&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max"
-                            f"&temperature_unit=fahrenheit&timezone=auto&forecast_days={days}"
-                            f"&start_date={start}"
+                            f"&temperature_unit=fahrenheit&timezone=auto&forecast_days={days}&start_date={start}",timeout=10
                         ).json()
                         if "daily" not in wx:
                             st.error("Could not fetch forecast.")
                         else:
-                            st.markdown(f'<div class="ai-box" style="margin-bottom:10px;"><div class="box-title">✈️ {r["name"]} Trip Forecast</div>Your {days}-day trip weather summary</div>', unsafe_allow_html=True)
                             fc = '<div class="forecast-row" style="flex-wrap:wrap;">'
                             for i in range(min(days, len(wx["daily"]["time"]))):
                                 date_str = wx["daily"]["time"][i]
@@ -803,10 +929,8 @@ def render_trip_planner():
                                 dl = round(wx["daily"]["temperature_2m_min"][i])
                                 dr = wx["daily"].get("precipitation_probability_max",[0]*days)[i]
                                 fc += (f'<div class="forecast-day" style="min-width:70px;">'
-                                       f'<div class="day-name">{day_label}</div>'
-                                       f'<div class="day-icon">{di}</div>'
-                                       f'<div class="day-hi">{dh}°F</div>'
-                                       f'<div class="day-lo">{dl}°F</div>'
+                                       f'<div class="day-name">{day_label}</div><div class="day-icon">{di}</div>'
+                                       f'<div class="day-hi">{dh}°F</div><div class="day-lo">{dl}°F</div>'
                                        f'<div style="font-size:10px;color:rgba(255,255,255,0.5);">🌧️{dr}%</div></div>')
                             st.markdown(fc + "</div>", unsafe_allow_html=True)
 
@@ -868,28 +992,22 @@ def render_multi_city_dashboard(unit):
         if st.button("🌍 Load Cities", key="load_multi"):
             st.session_state.multi_city_data = []
             with st.spinner("Loading world weather..."):
-                # Fetch all cities in parallel
-                def fetch_one(city):
+                for city in cities[:6]:
                     try:
                         res = fetch_weather(city, unit)
                         if res[0]:
                             wx_f, wx_d, _, meta = res
                             cur = wx_f["current"]; cur_d = wx_d["current"]
                             fgi_v, fgi_l, fgi_c = feel_good_index(cur["temperature_2m"], cur["relative_humidity_2m"], cur["wind_speed_10m"])
-                            return {
+                            st.session_state.multi_city_data.append({
                                 "name": meta["name"], "country": meta["country"],
                                 "temp": round(cur_d["temperature_2m"]), "unit": unit,
                                 "cond": WMO_CODES.get(cur["weather_code"],"🌡️"),
                                 "fgi": fgi_v, "fgi_col": fgi_c,
                                 "rain": cur.get("precipitation_probability", 0),
                                 "wind": round(cur["wind_speed_10m"])
-                            }
+                            })
                     except: pass
-                    return None
-                with ThreadPoolExecutor(max_workers=6) as ex:
-                    results = list(ex.map(fetch_one, cities[:6]))
-                st.session_state.multi_city_data = [r for r in results if r]
-
         if "multi_city_data" in st.session_state and st.session_state.multi_city_data:
             cols = st.columns(3)
             for i, city in enumerate(st.session_state.multi_city_data):
@@ -968,25 +1086,9 @@ def render_severe_weather_map(lat, lon, city_name, code):
 # ═══════════════════════════════════════════════════════════════
 def inject_pwa():
     st.markdown("""
-<div style="
-padding:12px 18px;
-margin-bottom:12px;
-border-radius:18px;
-background:rgba(255,255,255,0.12);
-backdrop-filter:blur(14px);
-border:1px solid rgba(255,255,255,0.2);
-color:white;
-font-weight:700;
-text-align:center;
-font-size:18px;
-">
-⚡ NimbusAI ULTRA • Enhanced Visual Edition
-</div>
-
     <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTmltYnVzQUkiLCJzaG9ydF9uYW1lIjoiTmltYnVzIiwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiMxYTZlZmYiLCJ0aGVtZV9jb2xvciI6IiMxYTZlZmYiLCJpY29ucyI6W3sic3JjIjoiaHR0cHM6Ly9lbW9qaXBlZGlhLm9yZy9pbWFnZXMvZW1vamlwZWRpYS9ub3JtYWwvc3VuLWJlaGluZC1zbWFsbC1jbG91ZF8yNmY0LWZlMGYucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XX0=">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="NimbusAI">
     <meta name="theme-color" content="#1a6eff">
     """, unsafe_allow_html=True)
@@ -998,12 +1100,10 @@ font-size:18px;
 def render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d):
     st.markdown("---")
     st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📊 Complete Weather Stats</p>', unsafe_allow_html=True)
-
     def rate(val, low_bad, low_ok, hi_ok, hi_bad):
         if val <= low_bad or val >= hi_bad: return "🔴"
         if val <= low_ok or val >= hi_ok:  return "🟡"
         return "🟢"
-
     stats = [
         ("🌡️ Temperature",  f"{round(temp_d)}{unit}", rate(temp_f,32,50,85,100)),
         ("🥵 Feels Like",   f"{round(feels_d)}{unit}", rate(temp_f,32,50,85,100)),
@@ -1022,130 +1122,537 @@ def render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi
 
 
 # ═══════════════════════════════════════════════════════════════
-# NEW FEATURE 16 — DEW POINT + PRESSURE CARD
+# NEW FEATURE A — ANIMATED WIND COMPASS
 # ═══════════════════════════════════════════════════════════════
-def render_dew_pressure(temp_f, humidity, pressure_hpa, unit):
-    dp_f = dew_point_f(temp_f, humidity)
-    dp_display = round(to_c(dp_f)) if unit == "°C" else round(dp_f)
-    dp_label = dew_point_label(dp_f)
-    pressure_inhg = round(pressure_hpa * 0.02953, 2) if pressure_hpa else None
-    pressure_str = f"{round(pressure_hpa)} hPa / {pressure_inhg} inHg" if pressure_hpa else "N/A"
-
+def render_wind_compass(wind_deg, wind_mph, gusts_mph):
+    deg = wind_deg or 0
     st.markdown(f"""<div class="glass-card">
-      <div class="box-title">🌡️ Dew Point & Pressure</div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;">
-        <div style="flex:1;">
-          <div style="font-size:11px;color:rgba(255,255,255,0.6);">Dew Point</div>
-          <div style="font-size:22px;font-weight:700;color:white;">{dp_display}{unit}</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:2px;">{dp_label}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">
-            Dew point = how muggy it really feels. Above 65°F feels uncomfortable.
-          </div>
-        </div>
-        <div style="flex:1;">
-          <div style="font-size:11px;color:rgba(255,255,255,0.6);">Pressure</div>
-          <div style="font-size:16px;font-weight:700;color:white;margin-top:2px;">{pressure_str}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">
-            Normal: ~1013 hPa. Rising = improving. Falling = storm coming.
-          </div>
+      <div class="box-title">🧭 Wind Direction Compass</div>
+      <div style="display:flex;align-items:center;gap:20px;">
+        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          {"".join(f'<text x="50" y="50" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif" transform="translate({int(44*math.sin(i*math.pi/4))},{int(-44*math.cos(i*math.pi/4))})">{["N","NE","E","SE","S","SW","W","NW"][i]}</text>' for i in range(8))}
+          <g transform="rotate({deg} 50 50)">
+            <polygon points="50,15 46,52 50,48 54,52" fill="#f87171"/>
+            <polygon points="50,85 46,48 50,52 54,48" fill="rgba(255,255,255,0.3)"/>
+          </g>
+          <circle cx="50" cy="50" r="4" fill="white"/>
+        </svg>
+        <div>
+          <div style="font-size:24px;font-weight:900;color:white;">{wind_dir_label(wind_deg)}</div>
+          <div style="font-size:14px;color:rgba(255,255,255,0.7);">{round(wind_mph)} mph</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);">Gusts: {round(gusts_mph)} mph</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">{round(deg)}° from N</div>
         </div>
       </div>
     </div>""", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════
-# NEW FEATURE 17 — CITY AUTOCOMPLETE SEARCH
-# (JS-powered suggestions using Open-Meteo geocoding)
+# NEW FEATURE B — PRECIPITATION RADAR (RainViewer)
 # ═══════════════════════════════════════════════════════════════
-def render_autocomplete_search():
+def render_precipitation_radar(lat, lon):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🌧️ Live Precipitation Radar</p>', unsafe_allow_html=True)
     import streamlit.components.v1 as comp
-    comp.html("""
-    <style>
-      #ac-wrap { position:relative; width:100%; font-family:Outfit,sans-serif; }
-      #ac-input { width:100%; box-sizing:border-box; background:rgba(255,255,255,0.2);
-        border:1px solid rgba(255,255,255,0.35); border-radius:12px; color:white;
-        font-size:15px; padding:10px 14px; outline:none; }
-      #ac-input::placeholder { color:rgba(255,255,255,0.55); }
-      #ac-list { position:absolute; top:44px; left:0; right:0; background:rgba(20,40,80,0.97);
-        border:1px solid rgba(255,255,255,0.25); border-radius:12px; z-index:9999;
-        max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:none; }
-      .ac-item { padding:10px 14px; color:white; font-size:14px; cursor:pointer;
-        border-bottom:1px solid rgba(255,255,255,0.08); }
-      .ac-item:hover { background:rgba(255,255,255,0.12); }
-      .ac-item:last-child { border-bottom:none; }
-    </style>
-    <div id="ac-wrap">
-      <input id="ac-input" placeholder="🔍 Search a city..." autocomplete="off"/>
-      <div id="ac-list"></div>
-    </div>
+    comp.html(f"""
+    <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.25);">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="radar_map" style="height:320px;width:100%;"></div>
     <script>
-    var inp = document.getElementById('ac-input');
-    var list = document.getElementById('ac-list');
-    var timer = null;
-    inp.addEventListener('input', function(){
-      clearTimeout(timer);
-      var q = inp.value.trim();
-      if(q.length < 2){ list.style.display='none'; return; }
-      timer = setTimeout(function(){
-        fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(q)+'&count=6')
-          .then(r=>r.json()).then(data=>{
-            list.innerHTML='';
-            if(!data.results||!data.results.length){ list.style.display='none'; return; }
-            data.results.forEach(function(place){
-              var label = place.name + (place.admin1 ? ', '+place.admin1 : '') + ', ' + (place.country||'');
-              var div = document.createElement('div');
-              div.className = 'ac-item';
-              div.textContent = label;
-              div.addEventListener('click', function(){
-                inp.value = place.name;
-                list.style.display='none';
-                // Push value into the Streamlit text input
-                var si = window.parent.document.querySelector('input[aria-label=""]');
-                if(!si){ si = window.parent.document.querySelectorAll('input[type="text"]')[0]; }
-                if(si){
-                  var nv = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
-                  nv.set.call(si, place.name);
-                  si.dispatchEvent(new Event('input',{bubbles:true}));
-                }
-              });
-              list.appendChild(div);
-            });
-            list.style.display='block';
-          }).catch(function(){ list.style.display='none'; });
-      }, 250);
-    });
-    document.addEventListener('click', function(e){
-      if(!document.getElementById('ac-wrap').contains(e.target)) list.style.display='none';
-    });
-    </script>
-    """, height=70)
+    (function(){{
+      var map = L.map('radar_map', {{zoomControl:true, scrollWheelZoom:false}}).setView([{lat},{lon}], 6);
+      L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
+        {{attribution:'© OpenStreetMap', maxZoom:18, opacity:0.6}}).addTo(map);
+      fetch('https://api.rainviewer.com/public/weather-maps.json')
+        .then(r => r.json())
+        .then(data => {{
+          var frames = data.radar.past;
+          var latest = frames[frames.length - 1];
+          L.tileLayer(
+            data.host + latest.path + '/512/{{z}}/{{x}}/{{y}}/2/1_1.png',
+            {{opacity: 0.75, attribution:'RainViewer'}}
+          ).addTo(map);
+          var icon = L.divIcon({{html:'<div style="font-size:24px;">📍</div>', iconSize:[30,30], className:''}});
+          L.marker([{lat},{lon}], {{icon:icon}}).addTo(map);
+        }})
+        .catch(() => {{
+          var icon = L.divIcon({{html:'<div style="font-size:24px;">📍</div>', iconSize:[30,30], className:''}});
+          L.marker([{lat},{lon}], {{icon:icon}}).addTo(map);
+        }});
+    }})();
+    </script></div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.4);padding:6px 10px;">Live radar powered by RainViewer API</div>
+    """, height=360)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE C — UV INDEX TIMELINE
+# ═══════════════════════════════════════════════════════════════
+def render_uv_timeline(lat, lon):
+    """Show UV index across the day as a colored bar from safe to dangerous."""
+    st.markdown('<div class="glass-card"><div class="box-title">🌞 UV Index Timeline</div>', unsafe_allow_html=True)
+    # Approximate UV curve: peaks at solar noon (~12-14h), zero at night
+    hours = list(range(24))
+    uv_approx = []
+    for h in hours:
+        if 6 <= h <= 20:
+            peak = 11 * math.sin(math.pi * (h - 6) / 14)
+            uv_approx.append(max(0, round(peak, 1)))
+        else:
+            uv_approx.append(0)
+    
+    def uv_color(v):
+        if v <= 2: return "#4ade80"
+        if v <= 5: return "#facc15"
+        if v <= 7: return "#f97316"
+        if v <= 10: return "#ef4444"
+        return "#9333ea"
+    
+    bars = ""
+    for i, v in enumerate(uv_approx):
+        h = max(4, int((v / 11) * 60))
+        col = uv_color(v)
+        label = str(i) if i % 3 == 0 else ""
+        bars += f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+        bars += f'<div style="height:{h}px;width:100%;background:{col};border-radius:3px 3px 0 0;opacity:{"1" if v > 0 else "0.15"};min-height:2px;"></div>'
+        bars += f'<div style="font-size:9px;color:rgba(255,255,255,0.4);">{label}</div></div>'
+    
+    legend = ""
+    for label, col in [("Low","#4ade80"),("Moderate","#facc15"),("High","#f97316"),("Very High","#ef4444"),("Extreme","#9333ea")]:
+        legend += f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.6);margin-right:8px;"><span style="width:8px;height:8px;background:{col};border-radius:2px;display:inline-block;"></span>{label}</span>'
+    
+    st.markdown(f"""
+      <div style="display:flex;align-items:flex-end;gap:1px;height:70px;margin:8px 0 4px;">{bars}</div>
+      <div style="margin-top:4px;">{legend}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE D — WEEKEND WEATHER SCORER
+# ═══════════════════════════════════════════════════════════════
+def render_weekend_scorer(daily_f, daily_d, unit):
+    st.markdown("---")
+    today = datetime.now()
+    days_to_sat = (5 - today.weekday()) % 7
+    days_to_sun = (6 - today.weekday()) % 7
+    if days_to_sat == 0: days_to_sat = 7
+    if days_to_sun == 0: days_to_sun = 7
+    
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🗓️ Weekend Weather Scorer</p>', unsafe_allow_html=True)
+    
+    def get_day_score(idx):
+        if idx >= len(daily_f["temperature_2m_max"]): return None
+        hi_f = daily_f["temperature_2m_max"][idx]
+        lo_f = daily_f["temperature_2m_min"][idx]
+        rain = daily_f.get("precipitation_probability_max", [50]*14)[idx]
+        code = daily_f["weather_code"][idx]
+        hi_d = round(daily_d["temperature_2m_max"][idx])
+        lo_d = round(daily_d["temperature_2m_min"][idx])
+        mid_f = (hi_f + lo_f) / 2
+        score = round(max(0, min(100,
+            (100 - abs(mid_f - 72) * 2) * 0.5 +
+            (100 - rain) * 0.4 +
+            (80 if code in {0,1,2} else 40 if code == 3 else 20) * 0.1
+        )))
+        return score, hi_d, lo_d, rain, WMO_CODES.get(code, "🌡️"), code
+    
+    sat_data = get_day_score(days_to_sat)
+    sun_data = get_day_score(days_to_sun)
+    
+    if not sat_data or not sun_data:
+        st.markdown('<div class="info-box">Weekend forecast not yet available (too far out).</div>', unsafe_allow_html=True)
+        return
+    
+    sat_score, sat_hi, sat_lo, sat_rain, sat_cond, sat_code = sat_data
+    sun_score, sun_hi, sun_lo, sun_rain, sun_cond, sun_code = sun_data
+    
+    sat_color = "#4ade80" if sat_score >= 70 else "#facc15" if sat_score >= 45 else "#f87171"
+    sun_color = "#4ade80" if sun_score >= 70 else "#facc15" if sun_score >= 45 else "#f87171"
+    winner = "Saturday" if sat_score > sun_score else ("Sunday" if sun_score > sat_score else "Both days")
+    
+    ca, cb = st.columns(2)
+    with ca:
+        st.markdown(f"""<div class="glass-card" style="text-align:center;">
+          <div class="box-title">Saturday</div>
+          <div style="font-size:36px;">{sat_cond.split()[0]}</div>
+          <div style="font-size:32px;font-weight:900;color:{sat_color};">{sat_score}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);">out of 100</div>
+          <div style="font-size:13px;color:white;margin-top:6px;">🔴 {sat_hi}{unit} · 🔵 {sat_lo}{unit}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);">🌧️ {sat_rain}% rain</div>
+        </div>""", unsafe_allow_html=True)
+    with cb:
+        st.markdown(f"""<div class="glass-card" style="text-align:center;">
+          <div class="box-title">Sunday</div>
+          <div style="font-size:36px;">{sun_cond.split()[0]}</div>
+          <div style="font-size:32px;font-weight:900;color:{sun_color};">{sun_score}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);">out of 100</div>
+          <div style="font-size:13px;color:white;margin-top:6px;">🔴 {sun_hi}{unit} · 🔵 {sun_lo}{unit}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);">🌧️ {sun_rain}% rain</div>
+        </div>""", unsafe_allow_html=True)
+    
+    verdict = f"🏆 **{winner}** {'is better for outdoor plans!' if winner != 'Both days' else 'are equally good!'}"
+    st.markdown(f'<div class="ai-box">{verdict}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE E — GOLDEN HOUR TIMER
+# ═══════════════════════════════════════════════════════════════
+def render_golden_hour(sunrise_str, sunset_str, local_now):
+    try:
+        sr = datetime.strptime(sunrise_str, "%I:%M %p")
+        ss = datetime.strptime(sunset_str, "%I:%M %p")
+        # Golden hour = ~1 hour after sunrise, ~1 hour before sunset
+        morning_gh_start = sr
+        morning_gh_end = sr.replace(hour=sr.hour+1, minute=sr.minute)
+        evening_gh_start = ss.replace(hour=ss.hour-1, minute=ss.minute)
+        evening_gh_end = ss
+        now_mins = local_now.hour * 60 + local_now.minute
+        mgs = morning_gh_start.hour * 60 + morning_gh_start.minute
+        mge = morning_gh_end.hour * 60 + morning_gh_end.minute
+        egs = evening_gh_start.hour * 60 + evening_gh_start.minute
+        ege = evening_gh_end.hour * 60 + evening_gh_end.minute
+        
+        if mgs <= now_mins <= mge:
+            status = "🌅 **Golden hour is NOW!** Perfect time for photography."
+            color = "#FCD34D"
+        elif egs <= now_mins <= ege:
+            status = "🌇 **Golden hour is NOW!** Go capture the magic light."
+            color = "#FB923C"
+        elif now_mins < mgs:
+            mins = mgs - now_mins
+            status = f"🌅 Morning golden hour in **{mins} min** ({morning_gh_start.strftime('%I:%M %p')} – {morning_gh_end.strftime('%I:%M %p')})"
+            color = "#FCD34D"
+        elif now_mins < egs:
+            mins = egs - now_mins
+            hrs = mins // 60; mins_rem = mins % 60
+            time_str = f"{hrs}h {mins_rem}m" if hrs else f"{mins_rem}m"
+            status = f"🌇 Evening golden hour in **{time_str}** ({evening_gh_start.strftime('%I:%M %p')} – {evening_gh_end.strftime('%I:%M %p')})"
+            color = "#FB923C"
+        else:
+            status = f"🌃 Next golden hour: tomorrow morning around {morning_gh_start.strftime('%I:%M %p')}"
+            color = "#94A3B8"
+        
+        st.markdown(f'<div class="glass-card"><div class="box-title">📸 Golden Hour Timer</div><div style="color:{color};font-size:14px;">{status}</div></div>', unsafe_allow_html=True)
+    except:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE F — COMMUTE WEATHER ADVISOR
+# ═══════════════════════════════════════════════════════════════
+def render_commute_advisor(hourly_temps_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🚗 Commute Weather Advisor</p>', unsafe_allow_html=True)
+    with st.expander("Get commute-specific weather advice"):
+        col1, col2 = st.columns(2)
+        with col1: depart_h = st.slider("Departure hour", 0, 23, 8, key="commute_dep")
+        with col2: return_h = st.slider("Return hour", 0, 23, 18, key="commute_ret")
+        if st.button("🚗 Check My Commute", key="check_commute"):
+            def commute_msg(h):
+                if h >= len(hourly_temps_d): return "Data not available for this hour."
+                t = hourly_temps_d[h]; r = hourly_rain_vals[h]; w = hourly_wind[h]
+                msgs = [f"🌡️ {round(t)}{unit}"]
+                if r > 60: msgs.append(f"🌧️ Heavy rain ({r}%) — allow extra travel time")
+                elif r > 30: msgs.append(f"🌦️ Possible rain ({r}%) — bring umbrella")
+                else: msgs.append(f"☀️ Dry ({r}% rain chance)")
+                if w > 20: msgs.append(f"💨 Strong winds ({round(w)} mph) — be careful on roads")
+                elif w > 10: msgs.append(f"🌬️ Breezy ({round(w)} mph)")
+                if t < 32: msgs.append("❄️ Freezing — black ice risk on roads")
+                return " · ".join(msgs)
+            
+            dep_lbl = hour_labels[depart_h] if depart_h < len(hour_labels) else f"{depart_h}:00"
+            ret_lbl = hour_labels[return_h] if return_h < len(hour_labels) else f"{return_h}:00"
+            st.markdown(f"""<div class="glass-card">
+              <div class="box-title">🌅 Departure ({dep_lbl})</div>
+              <div style="font-size:13px;color:white;">{commute_msg(depart_h)}</div>
+            </div>
+            <div class="glass-card">
+              <div class="box-title">🌆 Return ({ret_lbl})</div>
+              <div style="font-size:13px;color:white;">{commute_msg(return_h)}</div>
+            </div>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE G — WEATHER CHANGE DETECTOR
+# ═══════════════════════════════════════════════════════════════
+def render_weather_change_detector(temp_f, hourly_temps_f, hourly_rain_vals, now_h):
+    """Compare morning forecast (6am) to current and alert if significantly different."""
+    morning_h = 6
+    if morning_h < len(hourly_temps_f) and now_h > morning_h:
+        morning_temp = hourly_temps_f[morning_h]
+        current_temp = temp_f
+        temp_diff = current_temp - morning_temp
+        rain_now = hourly_rain_vals[now_h] if now_h < len(hourly_rain_vals) else 0
+        rain_morning = hourly_rain_vals[morning_h] if morning_h < len(hourly_rain_vals) else 0
+        
+        alerts = []
+        if abs(temp_diff) >= 10:
+            direction = "warmer" if temp_diff > 0 else "colder"
+            alerts.append(f"🌡️ It got **{round(abs(temp_diff))}°F {direction}** since this morning — {'shed a layer!' if temp_diff > 0 else 'grab a jacket!'}")
+        if rain_now > 50 and rain_morning < 30:
+            alerts.append("☔ **Rain developed unexpectedly** since morning — umbrella time!")
+        elif rain_morning > 50 and rain_now < 30:
+            alerts.append("☀️ **Rain cleared up** since morning — nicer than expected outside!")
+        
+        if alerts:
+            for alert in alerts:
+                st.markdown(f'<div class="warn-box" style="background:rgba(180,100,0,0.3);border-color:rgba(255,180,80,0.5);">⚠️ Weather Change Alert<br>{alert}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE H — WEATHER POSTCARD GENERATOR
+# ═══════════════════════════════════════════════════════════════
+def render_weather_postcard(city_name, country, temp_d, unit, condition, hi_d, lo_d, humidity, wind_mph, code, local_now):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📮 Weather Postcard</p>', unsafe_allow_html=True)
+    
+    sky = sky_class(code)
+    gradients = {
+        "sky-clear":   "linear-gradient(135deg,#1a6eff,#87ceeb)",
+        "sky-cloudy":  "linear-gradient(135deg,#4b5e7a,#b0c4d8)",
+        "sky-rain":    "linear-gradient(135deg,#1e3a5f,#4a7fa8)",
+        "sky-snow":    "linear-gradient(135deg,#6b8cae,#ddeeff)",
+        "sky-thunder": "linear-gradient(135deg,#1a1a2e,#4a3f6b)",
+        "sky-fog":     "linear-gradient(135deg,#6b7a8d,#c5d0d8)",
+    }
+    grad = gradients.get(sky, gradients["sky-clear"])
+    icon = condition.split()[0]
+    date_str = local_now.strftime("%B %d, %Y")
+    t_color = temp_color(temp_d if unit == "°F" else to_f(temp_d))
+    
+    postcard_html = f"""<div style="background:{grad};border-radius:20px;padding:24px 28px;position:relative;overflow:hidden;
+      box-shadow:0 12px 40px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);margin-bottom:12px;">
+      <div style="position:absolute;right:0;top:0;width:35%;height:100%;border-left:2px dashed rgba(255,255,255,0.25);"></div>
+      <div style="position:absolute;top:16px;right:12px;font-size:10px;color:rgba(255,255,255,0.6);writing-mode:horizontal-tb;">
+        <div style="background:rgba(255,255,255,0.2);border-radius:6px;padding:4px 8px;font-weight:700;">WEATHER STAMP</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.5);margin-top:4px;text-align:center;">{date_str}</div>
+      </div>
+      <div style="font-size:48px;margin-bottom:8px;">{icon}</div>
+      <div style="font-size:44px;font-weight:900;color:{t_color};text-shadow:0 2px 12px rgba(0,0,0,0.3);line-height:1;">{round(temp_d)}{unit}</div>
+      <div style="font-size:18px;font-weight:700;color:white;margin-top:4px;">{city_name}, {country}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:2px;">{condition.split(' ',1)[-1]}</div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:rgba(255,255,255,0.75);">
+        <span>🔴 {hi_d}{unit}</span><span>🔵 {lo_d}{unit}</span>
+        <span>💧 {humidity}%</span><span>💨 {round(wind_mph)} mph</span>
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:12px;font-style:italic;">Generated by NimbusAI 🌤️</div>
+    </div>"""
+    
+    share_text = f"📮 Weather from {city_name}, {country}\\n{icon} {condition.split(' ',1)[-1]}\\n🌡️ {round(temp_d)}{unit} | 🔴 Hi {hi_d}{unit} · 🔵 Lo {lo_d}{unit}\\n{date_str} · via NimbusAI"
+    
+    st.markdown(postcard_html, unsafe_allow_html=True)
+    st.markdown(f"""<button onclick="navigator.clipboard.writeText('{share_text}').then(()=>{{this.innerText='✅ Copied!';setTimeout(()=>this.innerText='📋 Copy Postcard Text',2000)}})"
+      style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:12px;
+             color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
+             padding:8px 20px;cursor:pointer;margin-bottom:14px;">📋 Copy Postcard Text</button>""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE I — 30-DAY TEMPERATURE HISTORY CHART
+# ═══════════════════════════════════════════════════════════════
+def render_30day_history(lat, lon, unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">📅 30-Day Temperature History</p>', unsafe_allow_html=True)
+    with st.expander("Show past 30 days of temperatures"):
+        with st.spinner("Loading historical data..."):
+            try:
+                end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+                url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                       f"&daily=temperature_2m_max,temperature_2m_min"
+                       f"&temperature_unit={'fahrenheit' if unit=='°F' else 'celsius'}"
+                       f"&timezone=auto&start_date={start_date}&end_date={end_date}")
+                data = requests.get(url, timeout=10).json()
+                if "daily" not in data:
+                    st.error("Could not load history."); return
+                
+                highs = data["daily"]["temperature_2m_max"]
+                lows  = data["daily"]["temperature_2m_min"]
+                dates = data["daily"]["time"]
+                n = len(highs)
+                W, H = 680, 160
+                PL, PR, PT, PB = 36, 10, 16, 32
+                CW, CH = W-PL-PR, H-PT-PB
+                all_vals = highs + lows
+                mn = min(all_vals) - 2; mx = max(all_vals) + 2; rng = mx - mn or 1
+                def tx(i): return PL + (i / max(n-1,1)) * CW
+                def ty(v): return PT + CH - ((v - mn) / rng) * CH
+                # Band area (high to low)
+                band_pts = " ".join(f"{tx(i):.1f},{ty(highs[i]):.1f}" for i in range(n))
+                band_pts += " " + " ".join(f"{tx(i):.1f},{ty(lows[i]):.1f}" for i in range(n-1,-1,-1))
+                hi_line = " ".join(f"{tx(i):.1f},{ty(highs[i]):.1f}" for i in range(n))
+                lo_line = " ".join(f"{tx(i):.1f},{ty(lows[i]):.1f}" for i in range(n))
+                x_labels = "".join(
+                    f'<text x="{tx(i):.1f}" y="{PT+CH+18}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">{datetime.strptime(dates[i],"%Y-%m-%d").strftime("%d")}</text>'
+                    for i in range(0, n, 5)
+                )
+                svg_html = (f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">'
+                    f'<defs><linearGradient id="band30" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(248,113,113,0.4)"/><stop offset="100%" stop-color="rgba(96,165,250,0.2)"/></linearGradient></defs>'
+                    f'<polygon points="{band_pts}" fill="url(#band30)"/>'
+                    f'<polyline points="{hi_line}" fill="none" stroke="#f87171" stroke-width="2" stroke-linejoin="round"/>'
+                    f'<polyline points="{lo_line}" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linejoin="round"/>'
+                    f'{x_labels}'
+                    f'<text x="{PL-4}" y="{ty(mx):.1f}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">{round(mx)}{unit}</text>'
+                    f'<text x="{PL-4}" y="{ty(mn):.1f}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">{round(mn)}{unit}</text>'
+                    f'</svg>')
+                
+                import streamlit.components.v1 as _c
+                _c.html(f'<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;}}</style>'
+                        f'<div class="gc"><div style="font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;">📅 Past 30 Days — <span style="color:#f87171;">High</span> / <span style="color:#60a5fa;">Low</span></div>'
+                        f'{svg_html}</div>', height=210, scrolling=False)
+            except Exception as e:
+                st.error(f"Could not load 30-day history: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE J — FRIENDS' WEATHER
+# ═══════════════════════════════════════════════════════════════
+def render_friends_weather(unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">👥 Friends\' Weather</p>', unsafe_allow_html=True)
+    with st.expander("See weather where your friends are"):
+        st.markdown('<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:8px;">Enter your friends\' cities (one per line)</div>', unsafe_allow_html=True)
+        friends_input = st.text_area("", placeholder="London\nTokyo\nSydney\nNew York", key="friends_cities", height=100, label_visibility="collapsed")
+        if st.button("👥 Check Friends' Weather", key="check_friends") and friends_input.strip():
+            cities = [c.strip() for c in friends_input.strip().split("\n") if c.strip()][:6]
+            with st.spinner("Fetching..."):
+                results = []
+                for city in cities:
+                    try:
+                        res = fetch_weather(city, unit)
+                        if res[0]:
+                            wx_f, wx_d, _, meta = res
+                            cur = wx_f["current"]; cur_d = wx_d["current"]
+                            results.append({
+                                "city": meta["name"], "country": meta["country"],
+                                "temp": round(cur_d["temperature_2m"]), "unit": unit,
+                                "cond": WMO_CODES.get(cur["weather_code"], "🌡️"),
+                                "rain": cur.get("precipitation_probability", 0),
+                                "wind": round(cur["wind_speed_10m"]),
+                                "humidity": cur["relative_humidity_2m"],
+                            })
+                    except: pass
+                if results:
+                    html = '<div style="display:flex;flex-direction:column;gap:8px;">'
+                    for r in results:
+                        icon = r["cond"].split()[0]
+                        desc = r["cond"].split(" ",1)[-1] if " " in r["cond"] else r["cond"]
+                        html += f"""<div class="glass-card" style="display:flex;align-items:center;gap:14px;padding:12px 16px;">
+                          <div style="font-size:32px;">{icon}</div>
+                          <div style="flex:1;">
+                            <div style="font-size:14px;font-weight:700;color:white;">{r['city']}, {r['country']}</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.6);">{desc}</div>
+                          </div>
+                          <div style="text-align:right;">
+                            <div style="font-size:24px;font-weight:900;color:white;">{r['temp']}{r['unit']}</div>
+                            <div style="font-size:10px;color:rgba(255,255,255,0.5);">💧{r['humidity']}% 💨{r['wind']}mph</div>
+                          </div>
+                        </div>"""
+                    st.markdown(html + "</div>", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# NEW FEATURE K — WEATHER TIME CAPSULE
+# ═══════════════════════════════════════════════════════════════
+def render_time_capsule(city_name, temp_d, unit, condition, humidity, wind_mph):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">⏳ Weather Time Capsule</p>', unsafe_allow_html=True)
+    if "capsule" not in st.session_state: st.session_state.capsule = []
+    with st.expander("📦 Seal today's weather in a time capsule"):
+        note = st.text_input("Add a note to your future self", placeholder="e.g. It's been raining for 3 days straight!", key="capsule_note")
+        if st.button("📦 Seal Time Capsule", key="seal_capsule"):
+            entry = {
+                "sealed_date": datetime.now().strftime("%B %d, %Y"),
+                "open_date": (datetime.now() + timedelta(days=365)).strftime("%B %d, %Y"),
+                "city": city_name, "temp": f"{round(temp_d)}{unit}",
+                "cond": condition, "humidity": humidity, "wind": round(wind_mph),
+                "note": note
+            }
+            st.session_state.capsule.insert(0, entry)
+            st.session_state.capsule = st.session_state.capsule[:10]
+            st.success(f"✅ Sealed! Open again on {entry['open_date']}")
+    
+    if st.session_state.capsule:
+        st.markdown('<div class="box-title" style="color:rgba(255,255,255,0.6);margin-top:8px;">Your Capsules</div>', unsafe_allow_html=True)
+        for entry in st.session_state.capsule[:3]:
+            st.markdown(f"""<div class="glass-card" style="border:1px dashed rgba(255,200,100,0.4);">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.5);">
+                <span>📦 Sealed {entry['sealed_date']}</span><span>🔓 Open {entry['open_date']}</span>
+              </div>
+              <div style="font-size:13px;color:white;margin-top:6px;">{entry['city']} · {entry['temp']} · {entry['cond'].split(' ',1)[-1]}</div>
+              {f'<div style="font-size:12px;color:rgba(255,220,100,0.8);margin-top:4px;">"{entry["note"]}"</div>' if entry['note'] else ''}
+            </div>""", unsafe_allow_html=True)
 
 
 # ── Session state ──────────────────────────────────────────────────────────────
 for k,v in [("history",[]),("city_input",""),("dark_mode",False),
-             ("last_updated",None),("outfit_memory",{})]:
+             ("last_updated",None),("outfit_memory",{}),
+             ("last_fetch_time",None),("last_fetch_city",""),("cached_weather",None)]:
     if k not in st.session_state: st.session_state[k]=v
+
+# Auto-load from URL param
+if url_city and not st.session_state.city_input:
+    st.session_state.city_input = url_city
 
 import streamlit.components.v1 as components
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 c1,c2=st.columns([5,1])
-with c1:
-    st.markdown(
-        '<p style="font-size:28px;font-weight:900;color:white;margin:0 0 4px;letter-spacing:-1px;">'
-        '<span class="live-dot"></span>🌤️ NimbusAI</p>',
-        unsafe_allow_html=True
-    )
+with c1: st.markdown('<p style="font-size:28px;font-weight:900;color:white;margin:0 0 4px;letter-spacing:-1px;">🌤️ NimbusAI</p>',unsafe_allow_html=True)
 with c2: st.session_state.dark_mode=st.toggle("🌙",value=st.session_state.dark_mode,help="Dark mode")
+
 if st.session_state.dark_mode:
-    st.markdown("<style>.stApp{filter:brightness(0.6) saturate(0.7) !important;}</style>",unsafe_allow_html=True)
+    st.markdown("""<style>
+      .hero-card,.glass-card,.ai-box,.wear-box,.info-box,.tomorrow-card,.forecast-day,.compare-col {
+        background:rgba(8,8,20,0.82) !important;
+        border-color:rgba(255,255,255,0.08) !important;
+      }
+      .stApp { filter:brightness(0.75) saturate(0.8) !important; }
+    </style>""", unsafe_allow_html=True)
 
 unit=st.radio("",["°F","°C"],horizontal=True,label_visibility="collapsed")
 
-# ── Location button ─────────────────────────────────────────────────────────────
+# ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+components.html("""
+<script>
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'r' || e.key === 'R') {
+    // Trigger refresh by finding the refresh button
+    var btns = window.parent.document.querySelectorAll('button');
+    for (var b of btns) { if (b.innerText.includes('Refresh')) { b.click(); break; } }
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    var inp = window.parent.document.querySelectorAll('input[type="text"]')[0];
+    if (inp) { var nv = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value'); nv.set.call(inp,''); inp.dispatchEvent(new Event('input',{bubbles:true})); }
+  }
+  // Number keys 1-3 load favourite cities
+  if (['1','2','3'].includes(e.key)) {
+    var idx = parseInt(e.key) - 1;
+    var loadBtns = window.parent.document.querySelectorAll('[data-testid="stButton"] button');
+    var loadCount = 0;
+    for (var b of loadBtns) {
+      if (b.innerText === 'Load') {
+        if (loadCount === idx) { b.click(); break; }
+        loadCount++;
+      }
+    }
+  }
+});
+</script>
+<div style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:6px;">
+  Shortcuts: <kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;">R</kbd> refresh 
+  <kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;">C</kbd> clear
+  <kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;">1-3</kbd> fav cities
+</div>""", height=40)
+
+# ── Location + Autocomplete ────────────────────────────────────────────────────
 components.html("""
 <div style="margin-bottom:10px;">
-  <button onclick="getLocation()" id="geo-btn" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);
+  <button onclick="getLocation()" id="geo-btn" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);
     border-radius:12px;color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
     padding:6px 16px;cursor:pointer;">📍 Use My Location</button>
   <span id="gs" style="color:rgba(255,255,255,0.6);font-size:12px;margin-left:10px;"></span>
@@ -1173,23 +1680,41 @@ function getLocation(){
 }
 </script>""",height=60)
 
-# NEW: autocomplete search widget
-render_autocomplete_search()
-
 if st.session_state.history:
     st.markdown(f'<div class="chip-row">'+''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)+'</div>',unsafe_allow_html=True)
 
-city_typed=st.text_input("",placeholder="Search a city...",label_visibility="collapsed",value=st.session_state.city_input)
+city_typed=st.text_input("",placeholder="Search a city...",label_visibility="collapsed",value=st.session_state.city_input,key="main_city_input")
+
+# ── Search autocomplete ────────────────────────────────────────────────────────
+if city_typed and len(city_typed) >= 3 and city_typed != st.session_state.get("last_fetch_city",""):
+    suggestions = fetch_city_suggestions(city_typed)
+    if suggestions:
+        st.markdown('<div class="autocomplete-box">', unsafe_allow_html=True)
+        for s in suggestions[:4]:
+            city_short = s.split(",")[0].strip()
+            if st.button(f"📍 {s}", key=f"suggest_{s[:30]}", use_container_width=True):
+                st.session_state.city_input = city_short
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
 fetch_city=city_typed.strip()
+
+# ── Auto-refresh every 30 minutes ─────────────────────────────────────────────
+if fetch_city and st.session_state.last_fetch_time:
+    mins_since = (datetime.now() - st.session_state.last_fetch_time).seconds // 60
+    if mins_since >= 30 and fetch_city == st.session_state.last_fetch_city:
+        st.markdown(f'<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:4px;">🔄 Auto-refreshed · Last updated {st.session_state.last_updated}</div>', unsafe_allow_html=True)
 
 # ── Main display ───────────────────────────────────────────────────────────────
 if fetch_city:
-    with st.spinner("Fetching weather..."):
+    with st.spinner("Fetching real weather..."):
         result=fetch_weather(fetch_city,unit)
         if result[0] is None:
             st.error("❌ City not found! Try a different spelling.")
             st.stop()
         wx_f,wx_display,aq,meta=result
+        st.session_state.last_fetch_time = datetime.now()
+        st.session_state.last_fetch_city = fetch_city
         lat,lon,city_name,country=meta["lat"],meta["lon"],meta["name"],meta["country"]
 
         aqi=aq.get("current",{}).get("us_aqi",None)
@@ -1205,8 +1730,6 @@ if fetch_city:
         code=cur_f["weather_code"]; humidity=cur_f["relative_humidity_2m"]
         rain_pct=cur_f.get("precipitation_probability",0); uv=cur_f.get("uv_index",0)
         vis_m=cur_f.get("visibility",None); vis_km=round(vis_m/1000,1) if vis_m else None
-        # NEW: surface pressure
-        pressure_hpa = cur_f.get("surface_pressure", None)
         condition_str=WMO_CODES.get(code,"Unknown"); wind_dir_str=wind_dir_label(wind_deg)
         temp_d=cur_d["temperature_2m"]; feels_d=cur_d["apparent_temperature"]
 
@@ -1235,10 +1758,6 @@ if fetch_city:
         hourly_rain_vals=wx_f["hourly"]["precipitation_probability"][h_slice]
         hourly_wind=wx_f["hourly"]["wind_speed_10m"][h_slice]
         hourly_times=wx_f["hourly"]["time"][h_slice]
-        # NEW: actual precipitation amount in mm
-        hourly_precip_mm = wx_f["hourly"].get("precipitation", [0]*48)[h_slice]
-        # NEW: hourly dew point
-        hourly_dew_f = wx_f["hourly"].get("dew_point_2m", [0]*48)[h_slice]
         hour_labels=[datetime.strptime(t,"%Y-%m-%dT%H:%M").strftime("%-I%p").lower() for t in hourly_times]
         week_hi_f=daily_f["temperature_2m_max"][1:7]; week_hi_d=daily_d["temperature_2m_max"][1:7]
 
@@ -1252,23 +1771,35 @@ if fetch_city:
         st.session_state.last_updated=local_now.strftime("%I:%M %p")
         if city_name not in st.session_state.history: st.session_state.history.insert(0,city_name)
         st.session_state.history=st.session_state.history[:6]
-        st.markdown(f"<style>.stApp{{background:{SKY_GRADIENTS.get(sky_bg,SKY_GRADIENTS['sky-clear'])} !important;}}</style>",unsafe_allow_html=True)
-        st.markdown(make_particles(sky_bg),unsafe_allow_html=True)
+
+        import streamlit.components.v1 as _cv
+        _cv.html(make_particles(sky_bg), height=0, scrolling=False)
 
         alt_t=f"/ {to_c(temp_f)}°C" if unit=="°F" else f"/ {to_f(temp_d)}°F"
         alt_f2=f"/ {to_c(feels_f)}°C" if unit=="°F" else f"/ {to_f(feels_d)}°F"
+        tc = temp_color(temp_f)
 
-        # ── Hero card — now with live dot ────────────────────────────────────
-        st.markdown(f"""<div class="hero-card">
+        # ── Weather change detector (shows before hero if alerting) ──
+        render_weather_change_detector(temp_f, hourly_temps_f, hourly_rain_vals, now_h)
+
+        # ── Hero Card with animated icon + gradient temp ───────────────
+        anim_icon = animated_weather_icon(code, 56)
+        st.markdown(f"""<div class="hero-card weather-content">
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
             <span style="font-size:32px;font-weight:800;color:white;letter-spacing:-1px;">{local_now.strftime("%I:%M %p")}</span>
             <span style="font-size:13px;color:rgba(255,255,255,0.6);">{local_now.strftime("%a, %b %d")}</span>
-            <span style="font-size:11px;color:rgba(255,255,255,0.4);margin-left:auto;"><span class="live-dot"></span>Live · Updated {st.session_state.last_updated}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.4);margin-left:auto;">Updated {st.session_state.last_updated}</span>
           </div>
           <div class="hero-city">📍 {city_name}, {country}</div>
-          <div class="hero-cond">{condition_str}</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+            {anim_icon}
+            <div class="hero-cond">{condition_str}</div>
+          </div>
           <div style="display:flex;align-items:flex-end;gap:16px;margin-top:8px;flex-wrap:wrap;">
-            <div><div class="hero-temp">{round(temp_d)}{unit}</div><div class="dual-temp">{alt_t}</div></div>
+            <div>
+              <div class="hero-temp" style="color:{tc};">{round(temp_d)}{unit}</div>
+              <div class="dual-temp">{alt_t}</div>
+            </div>
             <div style="padding-bottom:10px;">
               <div style="font-size:14px;color:rgba(255,255,255,0.7);margin-top:4px;">Feels like {round(feels_d)}{unit} <span style="font-size:12px;color:rgba(255,255,255,0.5);">{alt_f2}</span></div>
               <div><span class="hilo-badge">🔴 {hi_d}{unit}</span><span class="hilo-badge">🔵 {lo_d}{unit}</span></div>
@@ -1276,9 +1807,13 @@ if fetch_city:
           </div>
         </div>""",unsafe_allow_html=True)
 
-        rc1,rc2=st.columns([1,5])
+        rc1,rc2,rc3=st.columns([1,1,5])
         with rc1:
             if st.button("🔄 Refresh"): st.rerun()
+        with rc2:
+            # Share link with city param
+            city_param = city_name.replace(" ","+")
+            st.markdown(f'<a href="?city={city_param}" style="display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:12px;color:white;text-decoration:none;padding:6px 14px;font-size:13px;font-weight:600;">🔗 Share</a>', unsafe_allow_html=True)
 
         if code in SEVERE_CODES:
             st.markdown(f'<div class="warn-box"><strong>⚠️ SEVERE WEATHER ALERT</strong><br>{SEVERE_MESSAGES.get(code,"Stay safe!")}</div>',unsafe_allow_html=True)
@@ -1288,15 +1823,16 @@ if fetch_city:
         st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{ai_comment(temp_f,condition_str,wind_mph)}</div>',unsafe_allow_html=True)
         st.markdown(f'<div class="glass-card"><div class="box-title">🌡️ Why Does It Feel Like That?</div><div style="font-size:14px;color:white;">{feels_like_reason(temp_f,humidity,wind_mph)}</div></div>',unsafe_allow_html=True)
 
-        # NEW: dew point + pressure card
-        render_dew_pressure(temp_f, humidity, pressure_hpa, unit)
+        # Golden hour
+        render_golden_hour(sr_fmt, ss_fmt, local_now)
 
         t_icon=WMO_CODES.get(t_code,"🌡️").split()[0]; t_cond_str=WMO_CODES.get(t_code,"Unknown")
         t_alt_hi=f"/ {to_c(round(t_hi_f))}°C" if unit=="°F" else f"/ {to_f(t_hi_d)}°F"
+        t_anim = animated_weather_icon(t_code, 40)
         st.markdown(f"""<div class="tomorrow-card">
           <div class="box-title">📅 Tomorrow's Preview</div>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-            <div style="font-size:40px;">{t_icon}</div>
+            {t_anim}
             <div>
               <div style="font-size:16px;font-weight:700;color:white;">{t_cond_str}</div>
               <div style="font-size:14px;color:rgba(255,255,255,0.75);">High {t_hi_d}{unit} <span style="font-size:12px;opacity:0.6;">{t_alt_hi}</span> · Low {t_lo_d}{unit}</div>
@@ -1312,7 +1848,7 @@ if fetch_city:
                     f"🌧️ {rain_pct}% rain  🌞 UV {round(uv)}\\n"
                     f"Shared via NimbusAI 🌤️")
         st.markdown(f"""<button onclick="navigator.clipboard.writeText('{share_text}').then(()=>{{this.innerText='✅ Copied!';setTimeout(()=>this.innerText='📋 Share Weather',2000)}})"
-          style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);border-radius:12px;
+          style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:12px;
                  color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
                  padding:8px 20px;cursor:pointer;margin-bottom:14px;">📋 Share Weather</button>""",unsafe_allow_html=True)
 
@@ -1330,6 +1866,7 @@ if fetch_city:
         if saved:
             st.markdown(f'<div class="glass-card"><div class="box-title">💡 Your Saved Outfit</div><div style="color:white;font-size:14px;">👕 {saved}</div></div>',unsafe_allow_html=True)
 
+        # Feel-Good Index
         st.markdown(f"""<div class="glass-card" style="display:flex;align-items:center;gap:20px;">
           <svg width="80" height="80" viewBox="0 0 80 80">
             <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
@@ -1346,19 +1883,21 @@ if fetch_city:
         hum_msg,hum_col=humidity_comfort(humidity)
         st.markdown(f'<div class="glass-card"><div class="box-title">💧 Humidity Comfort</div><div style="font-size:14px;color:{hum_col};">{hum_msg}</div><div class="glass-sub">{humidity}% relative humidity</div></div>',unsafe_allow_html=True)
 
+        # Wind Compass (new)
+        render_wind_compass(wind_deg, wind_mph, gusts_mph)
+
         vis_str=f"{vis_km} km" if vis_km is not None else "N/A"
         c1,c2,c3,c4=st.columns(4)
         for col,(ico,lbl,val,sub) in zip([c1,c2,c3,c4],[
             ("💧","Humidity",f"{humidity}%",""),
-            ("💨","Wind",f"{round(wind_mph)} mph",f"{wind_dir_str} · Gusts {round(gusts_mph)} mph"),
             ("🌧️","Rain",f"{rain_pct}%","chance today"),
+            ("🌞","UV Index",f"{round(uv)}/11","out of 11"),
             ("👁️","Visibility",vis_str,""),
         ]):
             with col: st.markdown(f'<div class="glass-card"><div class="glass-label">{ico} {lbl}</div><div class="glass-value" style="font-size:18px;">{val}</div><div class="glass-sub">{sub}</div></div>',unsafe_allow_html=True)
 
-        c5,c6=st.columns(2)
-        with c5: st.markdown(f'<div class="glass-card"><div class="glass-label">🌞 UV Index</div><div class="glass-value">{round(uv)}</div><div class="glass-sub">out of 11</div></div>',unsafe_allow_html=True)
-        with c6: st.markdown(f'<div class="glass-card"><div class="glass-label">🌬️ Wind Direction</div><div class="glass-value">{wind_dir_str}</div><div class="glass-sub">{round(wind_deg or 0)}°</div></div>',unsafe_allow_html=True)
+        # UV Timeline
+        render_uv_timeline(lat, lon)
 
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
           <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌾 Grass Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(grass_pollen,"grass")}</div></div>
@@ -1373,9 +1912,7 @@ if fetch_city:
             dh=round(daily_d["temperature_2m_max"][idx]); dl=round(daily_d["temperature_2m_min"][idx])
             dhf=round(daily_f["temperature_2m_max"][idx]); dlf=round(daily_f["temperature_2m_min"][idx])
             au="°C" if unit=="°F" else "°F"; dha=to_c(dhf) if unit=="°F" else to_f(dh); dla=to_c(dlf) if unit=="°F" else to_f(dl)
-            # NEW: precipitation bar on forecast cards
-            dr = daily_f.get("precipitation_probability_max",[0]*7)[idx]
-            fc+=f'<div class="forecast-day"><div class="day-name">{dn}</div><div class="day-icon">{di}</div><div class="day-hi">{dh}{unit}</div><div class="day-lo">{dl}{unit}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">{dha}/{dla}{au}</div><div class="rain-bar-wrap" style="margin:4px 2px 0;"><div class="rain-bar-fill" style="width:{dr}%;"></div></div><div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:2px;">🌧️{dr}%</div></div>'
+            fc+=f'<div class="forecast-day"><div class="day-name">{dn}</div><div class="day-icon">{di}</div><div class="day-hi">{dh}{unit}</div><div class="day-lo">{dl}{unit}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">{dha}/{dla}{au}</div></div>'
         st.markdown(fc+"</div>",unsafe_allow_html=True)
 
         trend_up=week_hi_f[-1]>week_hi_f[0]; trend_label=f"📈 Warming trend this week" if trend_up else f"📉 Cooling trend this week"
@@ -1392,10 +1929,11 @@ if fetch_city:
         chart_feels = make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels)
         chart_rain  = make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100)
         chart_wind  = make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌡️ Hourly Temperature <span style="font-size:9px;color:rgba(255,255,255,0.4);">★ shaded = best outdoor window</span></div>{chart_temp}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🥵 Hourly Feels Like</div>{chart_feels}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:6px;"><div class="box-title">🌧️ Hourly Rain Probability</div>{chart_rain}</div>',unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card" style="padding:16px 12px 8px;margin-bottom:12px;"><div class="box-title">💨 Hourly Wind Speed</div>{chart_wind}</div>',unsafe_allow_html=True)
+        import streamlit.components.v1 as _c
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🌡️ Hourly Temperature <span style="font-size:9px;opacity:0.5;">★ shaded = best outdoor window</span></div>{chart_temp}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🥵 Hourly Feels Like</div>{chart_feels}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">🌧️ Hourly Rain Probability</div>{chart_rain}</div>''', height=210, scrolling=False)
+        _c.html(f'''<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style><div class="gc"><div class="bt">💨 Hourly Wind Speed</div>{chart_wind}</div>''', height=210, scrolling=False)
 
         pm_text=f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
         st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
@@ -1445,7 +1983,7 @@ if fetch_city:
                     with ca:
                         st.markdown(f"""<div class="compare-col">
                           <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {city_name}</div>
-                          <div style="font-size:32px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
+                          <div style="font-size:32px;font-weight:900;color:{temp_color(temp_f)};">{round(temp_d)}{unit}</div>
                           <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt_t}</div>
                           <div style="font-size:13px;color:white;margin-top:6px;">{condition_str}</div>
                           <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{humidity}% &nbsp;💨{round(wind_mph)}mph &nbsp;🌧️{rain_pct}%</div>
@@ -1454,7 +1992,7 @@ if fetch_city:
                     with cb:
                         st.markdown(f"""<div class="compare-col">
                           <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {meta2['name']}, {meta2['country']}</div>
-                          <div style="font-size:32px;font-weight:900;color:white;">{round(t2_d)}{unit}</div>
+                          <div style="font-size:32px;font-weight:900;color:{temp_color(t2)};">{round(t2_d)}{unit}</div>
                           <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt2}</div>
                           <div style="font-size:13px;color:white;margin-top:6px;">{WMO_CODES.get(c2_code,'Unknown')}</div>
                           <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{h2}% &nbsp;💨{round(w2)}mph &nbsp;🌧️{r2}%</div>
@@ -1463,35 +2001,40 @@ if fetch_city:
                     winner=f"🏆 {city_name} has better weather!" if fgi>fgi2 else (f"🏆 {meta2['name']} has better weather!" if fgi2>fgi else "🤝 Both cities feel about the same!")
                     st.markdown(f'<div class="ai-box" style="margin-top:8px;">{winner}</div>',unsafe_allow_html=True)
 
-        st.markdown('<p class="footer">Open-Meteo API • Air Quality API • OpenStreetMap • 100% Free 😄</p>',unsafe_allow_html=True)
+        st.markdown('<p class="footer">Open-Meteo API • RainViewer • Air Quality API • OpenStreetMap • No API keys needed 😄</p>',unsafe_allow_html=True)
 
-        # ── All features ──────────────────────────────────────────────────────
+        # ── All features ─────────────────────────────────────────────────────
         render_rain_countdown(hourly_rain_vals, hour_labels, now_h)
+        render_weekend_scorer(daily_f, daily_d, unit)
         activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition_str)
         render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d)
-        render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals,
-                            hourly_wind, hour_labels, unit, now_h, hourly_precip_mm)
+        render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h)
+        render_commute_advisor(hourly_temps_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h)
         render_music_mood(condition_str, temp_f, fgi)
+        render_weather_postcard(city_name, country, temp_d, unit, condition_str, hi_d, lo_d, humidity, wind_mph, code, local_now)
         render_weather_photo(condition_str, city_name)
+        render_precipitation_radar(lat, lon)
         render_aqi_health(aqi_text, pm25)
         render_historical(lat, lon, unit)
+        render_30day_history(lat, lon, unit)
         render_severe_weather_map(lat, lon, city_name, code)
         render_trip_planner()
         render_packing_list()
+        render_friends_weather(unit)
         render_weather_diary(city_name, temp_d, unit, condition_str)
+        render_time_capsule(city_name, temp_d, unit, condition_str, humidity, wind_mph)
         render_multi_city_dashboard(unit)
 
 # ── Favourites + PWA always visible ───────────────────────────────────────────
 render_favourites()
 inject_pwa()
 
-
+# ── Auto-refresh script ────────────────────────────────────────────────────────
 components.html("""
 <script>
-document.addEventListener('keydown', function(e){
-    if(e.key === 'r'){
-        window.location.reload();
-    }
-});
+// Auto-refresh every 30 minutes
+setTimeout(function() {
+  window.parent.location.reload();
+}, 30 * 60 * 1000);
 </script>
 """, height=0)
