@@ -15,6 +15,30 @@ st.markdown("""
 <div style="display:none"><style>
 * { font-family:'Outfit',sans-serif !important; }
 .stApp { background:transparent !important; min-height:100vh; }
+
+/* ── Custom weather cards always use white text (dark glass backgrounds) ── */
+.hero-card, .hero-card *, .glass-card, .glass-card *,
+.ai-box, .ai-box *, .wear-box, .wear-box *,
+.info-box, .info-box *, .warn-box, .warn-box *,
+.tomorrow-card, .tomorrow-card *, .forecast-day, .forecast-day *,
+.compare-col, .compare-col *, .chip, .hilo-badge,
+.hero-temp, .hero-city, .hero-cond,
+.glass-label, .glass-value, .glass-sub, .box-title,
+.day-name, .day-hi, .day-lo, .footer, .dual-temp,
+.autocomplete-box, .autocomplete-item { color: white !important; }
+
+/* ── Streamlit native widgets: black text (light mode default) ── */
+.stRadio label, .stRadio div, .stRadio span,
+.stToggle label, .stTextInput label, .stSelectbox label,
+.stSlider label, .stTextArea label, .stDateInput label,
+.stCheckbox label, .stExpander summary,
+.stSpinner p, p, h1, h2, h3, h4, h5, h6,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMetricLabel"], [data-testid="stMetricValue"] { color: #111 !important; }
+
+input::placeholder, textarea::placeholder { color: rgba(0,0,0,0.35) !important; }
+.stTextInput>div>div>input { color: #111 !important; }
+
 [data-testid="stAppViewContainer"],[data-testid="stHeader"],[data-testid="stMain"] { background:transparent !important; }
 .hero-card   { border-radius:24px; padding:32px 28px 24px; color:white; margin-bottom:16px;
                background:rgba(255,255,255,0.08); box-shadow:0 8px 48px rgba(0,0,0,0.4),0 2px 0 rgba(255,255,255,0.12) inset;
