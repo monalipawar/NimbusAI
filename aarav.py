@@ -1635,6 +1635,13 @@ if st.session_state.dark_mode:
         border-color:rgba(255,255,255,0.08) !important;
       }
       .stApp { filter:brightness(0.75) saturate(0.8) !important; }
+      /* Re-assert white text inside all cards so the global p/h rule doesn't override */
+      .hero-card *, .glass-card *, .ai-box *, .wear-box *,
+      .info-box *, .warn-box *, .tomorrow-card *, .forecast-day *,
+      .compare-col *, .chip, .hilo-badge,
+      .hero-temp, .hero-city, .hero-cond,
+      .glass-label, .glass-value, .glass-sub, .box-title,
+      .day-name, .day-hi, .day-lo, .footer, .dual-temp { color: white !important; }
     </style>""", unsafe_allow_html=True)
 
 unit=st.radio("",["°F","°C"],horizontal=True,label_visibility="collapsed")
