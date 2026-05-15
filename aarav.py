@@ -1890,6 +1890,732 @@ def render_autocomplete_search():
 
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BATCH 2 — 25 MORE FEATURES — All 100% free, no API keys
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── B1: Time-of-day sky gradient injector ────────────────────────────────────
+def inject_time_sky(local_now, sky_bg):
+    h = local_now.hour + local_now.minute / 60
+    if sky_bg not in ("sky-clear", "sky-cloudy"):
+        return  # only override clear/cloudy — keep rain/snow/thunder/fog
+    if h < 5 or h >= 22:
+        grad = "linear-gradient(160deg,#020510 0%,#0a1628 50%,#1a2a4a 100%)"
+    elif h < 6.5:
+        grad = "linear-gradient(160deg,#1a0a28 0%,#8B3A5A 40%,#FF6B35 70%,#FFB347 100%)"
+    elif h < 8:
+        grad = "linear-gradient(160deg,#FF6B35 0%,#FFB347 40%,#87CEEB 80%,#1a6eff 100%)"
+    elif h < 17:
+        grad = "linear-gradient(160deg,#0a1628 0%,#1a6eff 55%,#87ceeb 100%)"
+    elif h < 19:
+        grad = "linear-gradient(160deg,#1a2a4a 0%,#e05a1a 40%,#FFB347 70%,#87CEEB 100%)"
+    elif h < 20.5:
+        grad = "linear-gradient(160deg,#0d0d2e 0%,#8B2252 40%,#e05a1a 70%,#FFB347 100%)"
+    else:
+        grad = "linear-gradient(160deg,#020510 0%,#0a1628 55%,#1a2a4a 100%)"
+    st.markdown(f"<style>.stApp{{background:{grad} !important;}}</style>", unsafe_allow_html=True)
+
+
+# ── B2: Card rain drizzle overlay ────────────────────────────────────────────
+def inject_card_rain(sky_bg):
+    if sky_bg not in ("sky-rain", "sky-thunder"):
+        return
+    st.markdown("""
+    <style>
+    @keyframes card-drip {
+      0%   { transform: translateY(-6px); opacity: 0; }
+      20%  { opacity: 0.6; }
+      100% { transform: translateY(14px); opacity: 0; }
+    }
+    .glass-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0px, transparent 18px,
+        rgba(150,210,255,0.06) 18px, rgba(150,210,255,0.06) 20px
+      );
+      border-radius: 16px;
+      pointer-events: none;
+      animation: card-drip 1.8s linear infinite;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# ── B3: Temperature thermometer SVG ──────────────────────────────────────────
+def thermometer_svg(temp_f, unit, temp_d):
+    pct = max(0, min(1, (temp_f - 0) / 120))
+    fill_h = round(pct * 80)
+    col = "#93C5FD" if temp_f < 40 else "#4ADE80" if temp_f < 70 else "#FB923C" if temp_f < 90 else "#EF4444"
+    return f"""<div class="glass-card" style="text-align:center;padding:16px;">
+      <div class="box-title">🌡️ Temperature Gauge</div>
+      <svg viewBox="0 0 60 130" xmlns="http://www.w3.org/2000/svg" style="width:60px;height:130px;margin:0 auto;display:block;">
+        <rect x="22" y="10" width="16" height="85" rx="8" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+        <rect x="24" y="{10 + (80 - fill_h)}" width="12" height="{fill_h + 15}" rx="6" fill="{col}" opacity="0.85"/>
+        <circle cx="30" cy="105" r="12" fill="{col}" opacity="0.9"/>
+        <circle cx="30" cy="105" r="7" fill="{col}"/>
+        <text x="42" y="14" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">120°</text>
+        <text x="42" y="54" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">60°</text>
+        <text x="42" y="94" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">0°</text>
+      </svg>
+      <div style="font-size:20px;font-weight:700;color:{col};margin-top:6px;">{round(temp_d)}{unit}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);">{"Freezing" if temp_f<32 else "Cold" if temp_f<50 else "Cool" if temp_f<65 else "Comfortable" if temp_f<77 else "Warm" if temp_f<90 else "Hot"}</div>
+    </div>"""
+
+
+# ── B4: Feels-like vs actual comparison ──────────────────────────────────────
+def render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit):
+    diff = feels_f - temp_f
+    if diff < -3:
+        reason = f"🌬️ Wind chill — {round(wind_mph)} mph winds making it feel {abs(round(diff))}° colder"
+        bar_col = "#60A5FA"
+    elif diff > 3:
+        reason = f"💧 Humidity — {humidity}% moisture trapping heat, feels {round(diff)}° warmer"
+        bar_col = "#FB923C"
+    else:
+        reason = "✅ Feels very close to actual — calm winds and comfortable humidity"
+        bar_col = "#4ADE80"
+    actual_pct = 60; feels_pct = round(actual_pct + (diff / 30) * 40)
+    feels_pct = max(10, min(90, feels_pct))
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🌡️ Actual vs Feels Like</div>
+      <div style="display:flex;align-items:center;gap:20px;margin:10px 0;flex-wrap:wrap;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">ACTUAL</div>
+          <div style="font-size:36px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
+        </div>
+        <div style="font-size:28px;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">FEELS LIKE</div>
+          <div style="font-size:36px;font-weight:900;color:{bar_col};">{round(feels_d)}{unit}</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.1);border-radius:8px;height:8px;margin:8px 0;overflow:hidden;">
+        <div style="height:8px;width:{feels_pct}%;background:{bar_col};border-radius:8px;transition:width 0.8s;"></div>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);">{reason}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B5: Sunrise/sunset progress bar ──────────────────────────────────────────
+def render_day_progress(local_now, sunrise_str, sunset_str):
+    try:
+        sr = datetime.strptime(sunrise_str, "%I:%M %p")
+        ss = datetime.strptime(sunset_str,  "%I:%M %p")
+        now_m = local_now.hour * 60 + local_now.minute
+        sr_m  = sr.hour * 60 + sr.minute
+        ss_m  = ss.hour * 60 + ss.minute
+        day_len = ss_m - sr_m
+        pct = max(0, min(100, round((now_m - sr_m) / day_len * 100)))
+        is_day = sr_m <= now_m <= ss_m
+        elapsed_h = (now_m - sr_m) // 60; elapsed_m = (now_m - sr_m) % 60
+        remain_h  = (ss_m - now_m) // 60;  remain_m  = (ss_m - now_m) % 60
+        if is_day:
+            msg = f"☀️ {elapsed_h}h {elapsed_m}m since sunrise · {remain_h}h {remain_m}m until sunset"
+        else:
+            msg = "🌙 After sunset — night time"
+        st.markdown(f"""<div class="glass-card">
+          <div class="box-title">🌅 Day Progress</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:6px;">
+            <span>🌅 {sunrise_str}</span><span>{pct}% of daylight</span><span>🌇 {sunset_str}</span>
+          </div>
+          <div style="background:rgba(255,255,255,0.1);border-radius:20px;height:14px;overflow:hidden;position:relative;">
+            <div style="height:14px;width:{pct}%;background:linear-gradient(90deg,#FF6B35,#FFD700,#87CEEB);border-radius:20px;transition:width 1s;"></div>
+            <div style="position:absolute;top:0;left:{pct}%;transform:translateX(-50%);font-size:12px;line-height:14px;">{"☀️" if is_day else "🌙"}</div>
+          </div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;">{msg}</div>
+        </div>""", unsafe_allow_html=True)
+    except: pass
+
+
+# ── B6: Wind gust vs sustained visual ────────────────────────────────────────
+def render_wind_detail(wind_mph, gusts_mph, wind_dir_str):
+    gust_pct = min(100, round(gusts_mph / 60 * 100))
+    wind_pct = min(100, round(wind_mph  / 60 * 100))
+    diff     = gusts_mph - wind_mph
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">💨 Wind Detail — Sustained vs Gusts</div>
+      <div style="margin:10px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px;">
+          <span>Sustained</span><span style="color:white;font-weight:700;">{round(wind_mph)} mph {wind_dir_str}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:10px;overflow:hidden;">
+          <div style="height:10px;width:{wind_pct}%;background:#4ADE80;border-radius:6px;"></div>
+        </div>
+      </div>
+      <div style="margin:10px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px;">
+          <span>Gusts</span><span style="color:#FB923C;font-weight:700;">{round(gusts_mph)} mph</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:10px;overflow:hidden;">
+          <div style="height:10px;width:{gust_pct}%;background:#FB923C;border-radius:6px;"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;">
+        {"⚠️ High gust differential — unexpected strong bursts possible" if diff > 15 else "✅ Gusts close to sustained — consistent wind conditions"}
+        · Gust spike: +{round(diff)} mph
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B7: Dew point display + comfort ──────────────────────────────────────────
+def dew_point_f(temp_f, humidity):
+    """Calculate dew point in Fahrenheit."""
+    temp_c = (temp_f - 32) * 5 / 9
+    a = 17.27; b = 237.7
+    alpha = (a * temp_c) / (b + temp_c) + math.log(humidity / 100)
+    dp_c = (b * alpha) / (a - alpha)
+    return round(dp_c * 9 / 5 + 32, 1)
+
+def render_dew_point(temp_f, humidity, unit):
+    dp_f = dew_point_f(temp_f, humidity)
+    dp_d = dp_f if unit == "°F" else to_c(dp_f)
+    if dp_f < 50:  comfort, col = "Dry & comfortable", "#4ADE80"
+    elif dp_f < 60: comfort, col = "Comfortable",       "#a3e635"
+    elif dp_f < 65: comfort, col = "Slightly humid",    "#FACC15"
+    elif dp_f < 70: comfort, col = "Humid & sticky",    "#FB923C"
+    else:           comfort, col = "Very oppressive",   "#EF4444"
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">💦 Dew Point</div>
+      <div style="font-size:28px;font-weight:700;color:{col};">{round(dp_d)}{unit}</div>
+      <div style="font-size:13px;color:{col};margin-top:4px;">{comfort}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;">
+        Dew point = temperature at which air becomes saturated · More reliable comfort indicator than humidity alone
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B8: Visibility gauge SVG ──────────────────────────────────────────────────
+def visibility_gauge_svg(vis_km):
+    if vis_km is None: return ""
+    pct = min(1, vis_km / 10)
+    angle = -140 + pct * 280  # -140° to +140°
+    col = "#EF4444" if vis_km < 1 else "#FB923C" if vis_km < 3 else "#FACC15" if vis_km < 6 else "#4ADE80"
+    label = "Dense fog" if vis_km < 0.5 else "Fog" if vis_km < 2 else "Haze" if vis_km < 5 else "Good" if vis_km < 8 else "Excellent"
+    rad = math.radians(angle)
+    nx = 50 + 35 * math.cos(rad); ny = 60 + 35 * math.sin(rad)
+    return f"""<div class="glass-card" style="text-align:center;padding:16px;">
+      <div class="box-title">👁️ Visibility Gauge</div>
+      <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" style="width:120px;height:96px;margin:0 auto;display:block;">
+        <path d="M10,60 A40,40 0 1,1 90,60" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M10,60 A40,40 0 1,1 90,60" fill="none" stroke="{col}" stroke-width="8"
+              stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="{125.6*(1-pct):.1f}"/>
+        <line x1="50" y1="60" x2="{nx:.1f}" y2="{ny:.1f}" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="50" cy="60" r="4" fill="white"/>
+        <text x="50" y="76" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">{label}</text>
+      </svg>
+      <div style="font-size:20px;font-weight:700;color:{col};">{vis_km} km</div>
+    </div>"""
+
+
+# ── B9: Precipitation mm forecast ────────────────────────────────────────────
+def render_precip_forecast(lat, lon, unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🌧️ Precipitation Forecast (mm/hr)</p>', unsafe_allow_html=True)
+    with st.expander("Show hourly precipitation amounts"):
+        try:
+            data = requests.get(
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                f"&hourly=precipitation&timezone=auto&forecast_days=2&past_days=1",
+                timeout=6
+            ).json()
+            if "hourly" not in data: st.warning("Data unavailable"); return
+            precip = data["hourly"]["precipitation"][24:48]
+            times  = data["hourly"]["time"][24:48]
+            labels = [datetime.strptime(t, "%Y-%m-%dT%H:%M").strftime("%-I%p").lower() for t in times]
+            max_p  = max(precip) if precip else 1
+            html = '<div style="display:flex;gap:3px;align-items:flex-end;height:80px;margin-bottom:6px;">'
+            for i, (p, lbl) in enumerate(zip(precip, labels)):
+                h = max(2, round((p / max(max_p, 0.1)) * 72))
+                col = "#60A5FA" if p < 2 else "#3B82F6" if p < 5 else "#1D4ED8"
+                html += f'<div title="{lbl}: {p}mm" style="flex:1;height:{h}px;background:{col};border-radius:2px 2px 0 0;opacity:0.85;min-width:3px;"></div>'
+            html += '</div><div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.4);">'
+            for i in range(0, 24, 4): html += f"<span>{labels[i]}</span>"
+            html += f'</div><div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;">Total today: <strong style="color:#60A5FA;">{sum(precip):.1f} mm</strong> · Max rate: <strong style="color:#3B82F6;">{max_p:.1f} mm/hr</strong></div>'
+            st.markdown(f'<div class="glass-card">{html}</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.warning(f"Could not load precipitation data: {str(e)[:50]}")
+
+
+# ── B10: Forecast confidence score ───────────────────────────────────────────
+def forecast_confidence(day_offset):
+    """Returns confidence % — drops with forecast distance."""
+    scores = {0:98, 1:95, 2:90, 3:83, 4:74, 5:63, 6:50, 7:38}
+    return scores.get(day_offset, 30)
+
+def render_confidence_badges(daily_f):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🎯 Forecast Confidence</p>', unsafe_allow_html=True)
+    html = '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+    for i in range(min(7, len(daily_f.get("time", [])))):
+        idx = i + 1
+        try:
+            d = datetime.strptime(daily_f["time"][idx], "%Y-%m-%d")
+            lbl = "Today" if i == 0 else d.strftime("%a")
+        except: lbl = f"Day {i}"
+        conf = forecast_confidence(i)
+        col = "#4ADE80" if conf >= 85 else "#FACC15" if conf >= 65 else "#FB923C" if conf >= 45 else "#EF4444"
+        html += f'<div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:8px 12px;text-align:center;min-width:60px;">'
+        html += f'<div style="font-size:10px;color:rgba(255,255,255,0.6);">{lbl}</div>'
+        html += f'<div style="font-size:18px;font-weight:700;color:{col};">{conf}%</div>'
+        html += f'<div style="font-size:9px;color:{col};">{"High" if conf>=85 else "Good" if conf>=65 else "Fair" if conf>=45 else "Low"}</div></div>'
+    html += '</div>'
+    st.markdown(f'<div class="glass-card">{html}</div>', unsafe_allow_html=True)
+
+
+# ── B11: Should I open my windows? ───────────────────────────────────────────
+def render_windows_advisor(temp_f, aqi_text, grass_pollen, tree_pollen, wind_mph, condition_str):
+    try: aqi_num = int(aqi_text.split()[0])
+    except: aqi_num = 50
+    cond = condition_str.lower()
+    reasons_yes = []; reasons_no = []
+    if 60 <= temp_f <= 80:   reasons_yes.append("🌡️ Perfect temperature for fresh air")
+    else:                     reasons_no.append(f"🌡️ {'Too cold' if temp_f<60 else 'Too hot'} — AC/heat more efficient")
+    if aqi_num <= 50:         reasons_yes.append("💨 Air quality is excellent outdoors")
+    elif aqi_num <= 100:      reasons_no.append("💨 Moderate AQI — filtered air preferable")
+    else:                     reasons_no.append(f"💨 Poor air quality (AQI {aqi_num}) — keep closed")
+    if grass_pollen and grass_pollen > 50: reasons_no.append("🌾 High grass pollen — allergy risk")
+    if tree_pollen and tree_pollen > 90:   reasons_no.append("🌳 High tree pollen — allergy risk")
+    if any(x in cond for x in ["rain","thunder","snow"]): reasons_no.append("🌧️ Precipitation — keep closed")
+    if wind_mph > 20: reasons_no.append(f"💨 Very windy ({round(wind_mph)} mph) — may cause drafts")
+    open_it = len(reasons_yes) > len(reasons_no)
+    verdict = "✅ Yes — open your windows!" if open_it else "❌ No — keep them closed"
+    col     = "#4ADE80" if open_it else "#EF4444"
+    all_reasons = [f"✅ {r}" for r in reasons_yes] + [f"❌ {r}" for r in reasons_no]
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🪟 Should I Open My Windows?</div>
+      <div style="font-size:20px;font-weight:700;color:{col};margin:8px 0;">{verdict}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);">{"<br>".join(all_reasons)}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B12: Allergy alert ────────────────────────────────────────────────────────
+def render_allergy_alert(grass_pollen, tree_pollen, aqi_text, wind_mph):
+    try: aqi_num = int(aqi_text.split()[0])
+    except: aqi_num = 50
+    score = 0
+    if grass_pollen:
+        if grass_pollen > 200: score += 4
+        elif grass_pollen > 50: score += 2
+        elif grass_pollen > 10: score += 1
+    if tree_pollen:
+        if tree_pollen > 1500: score += 4
+        elif tree_pollen > 90: score += 2
+        elif tree_pollen > 15: score += 1
+    if aqi_num > 150: score += 3
+    elif aqi_num > 100: score += 2
+    elif aqi_num > 50: score += 1
+    if wind_mph > 20: score += 2
+    elif wind_mph > 10: score += 1
+    score = min(10, score)
+    col = "#4ADE80" if score<=2 else "#FACC15" if score<=4 else "#FB923C" if score<=7 else "#EF4444"
+    lbl = "Low" if score<=2 else "Moderate" if score<=4 else "High" if score<=7 else "Very High"
+    advice = []
+    if score >= 3: advice.append("💊 Consider taking antihistamines before going outside")
+    if score >= 5: advice.append("🕶️ Wear wraparound sunglasses to protect eyes")
+    if score >= 5: advice.append("🚿 Shower after outdoor activity to remove pollen")
+    if score >= 7: advice.append("😷 Consider wearing an N95 mask outdoors")
+    if score >= 8: advice.append("🏠 Limit time outside — stay indoors if possible")
+    if not advice: advice.append("✅ Low allergy risk — enjoy the outdoors!")
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🌿 Allergy Alert Score</div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="font-size:48px;font-weight:900;color:{col};">{score}<span style="font-size:20px;">/10</span></div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:{col};">{lbl} Risk</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);">Pollen + AQI + Wind combined score</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:13px;color:rgba(255,255,255,0.85);">{"<br>".join(advice)}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B13: Best day this week ───────────────────────────────────────────────────
+def render_best_day(daily_f, daily_d, unit):
+    try:
+        best_score = -999; best_i = 1
+        for i in range(1, min(8, len(daily_f["temperature_2m_max"]))):
+            hi = daily_f["temperature_2m_max"][i]
+            lo = daily_f["temperature_2m_min"][i]
+            mid = (hi + lo) / 2
+            rain = daily_f.get("precipitation_probability_max", [50]*8)[i]
+            score = (100 - abs(mid - 68) * 2) - rain * 0.8
+            if score > best_score: best_score = score; best_i = i
+        d = datetime.strptime(daily_f["time"][best_i], "%Y-%m-%d")
+        lbl = "Today" if best_i == 1 else d.strftime("%A, %B %d")
+        hi_d = round(daily_d["temperature_2m_max"][best_i])
+        lo_d = round(daily_d["temperature_2m_min"][best_i])
+        rain = daily_f.get("precipitation_probability_max", [0]*8)[best_i]
+        icon = WMO_CODES.get(daily_f["weather_code"][best_i], "🌡️").split()[0]
+        st.markdown(f"""<div class="glass-card" style="border:1px solid rgba(74,222,128,0.4);">
+          <div class="box-title">🏆 Best Day This Week for Outdoors</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:8px;">
+            <div style="font-size:48px;">{icon}</div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#4ADE80;">{lbl}</div>
+              <div style="font-size:14px;color:rgba(255,255,255,0.8);">{hi_d}/{lo_d}{unit} · 🌧️ {rain}% rain</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;">Score: {round(best_score)}/100</div>
+            </div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+    except: pass
+
+
+# ── B14: Running pace advisor ─────────────────────────────────────────────────
+def render_running_advisor(temp_f, humidity, wind_mph, aqi_text, unit, temp_d):
+    try: aqi_num = int(aqi_text.split()[0])
+    except: aqi_num = 50
+    base_pace_min = 10  # 10 min/mile base
+    adjust = 0
+    if temp_f > 80: adjust += (temp_f - 80) * 0.1
+    if temp_f < 40: adjust += (40 - temp_f) * 0.05
+    if humidity > 70: adjust += (humidity - 70) * 0.04
+    if wind_mph > 10: adjust += (wind_mph - 10) * 0.05
+    if aqi_num > 100: adjust += 1.5
+    adjusted = base_pace_min + adjust
+    adj_min = int(adjusted); adj_sec = round((adjusted - adj_min) * 60)
+    col = "#4ADE80" if adjust < 0.5 else "#FACC15" if adjust < 1.5 else "#FB923C" if adjust < 3 else "#EF4444"
+    tips = []
+    if temp_f > 80: tips.append("💧 Carry water — risk of dehydration")
+    if temp_f < 35: tips.append("🧤 Warm up indoors first — cold muscles")
+    if humidity > 75: tips.append("💦 High humidity — sweat less efficient, slow down")
+    if wind_mph > 15: tips.append("🌬️ Run into wind first half — tailwind on the way back")
+    if aqi_num > 100: tips.append("😷 Poor air quality — wear a mask or run indoors")
+    if not tips: tips.append("✅ Great running conditions!")
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🏃 Running Pace Advisor</div>
+      <div style="display:flex;align-items:center;gap:20px;margin:10px 0;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);">BASE PACE</div>
+          <div style="font-size:24px;font-weight:700;color:white;">10:00<span style="font-size:12px;">/mi</span></div>
+        </div>
+        <div style="font-size:24px;color:rgba(255,255,255,0.4);">→</div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);">ADJUSTED</div>
+          <div style="font-size:24px;font-weight:700;color:{col};">{adj_min}:{adj_sec:02d}<span style="font-size:12px;">/mi</span></div>
+        </div>
+        <div style="font-size:12px;color:{col};">+{adjust:.1f} min added by weather</div>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);">{"<br>".join(tips)}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B15: Sleep quality forecast ───────────────────────────────────────────────
+def render_sleep_forecast(hourly_temps_f, hourly_wind, hour_labels):
+    night_hours = list(range(20, 24)) + list(range(0, 8))
+    night_temps  = [hourly_temps_f[i] for i in range(20, 24)]
+    night_winds  = [hourly_wind[i]    for i in range(20, 24)]
+    avg_t = sum(night_temps) / len(night_temps) if night_temps else 68
+    avg_w = sum(night_winds) / len(night_winds) if night_winds else 0
+    score = 10
+    if avg_t < 60 or avg_t > 72: score -= round(abs(avg_t - 66) / 4)
+    if avg_w > 15: score -= 2
+    elif avg_w > 8: score -= 1
+    score = max(0, min(10, score))
+    col = "#4ADE80" if score >= 8 else "#FACC15" if score >= 5 else "#EF4444"
+    tips = []
+    if avg_t > 72: tips.append("🔥 Warm night — use a fan or AC for better sleep")
+    elif avg_t < 60: tips.append("❄️ Cool night — extra blanket recommended")
+    else: tips.append("✅ Ideal sleeping temperature tonight")
+    if avg_w > 15: tips.append("💨 Windy night — noise may disturb sleep")
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">😴 Sleep Quality Forecast — Tonight</div>
+      <div style="display:flex;align-items:center;gap:16px;margin:8px 0;">
+        <div style="font-size:48px;font-weight:900;color:{col};">{score}<span style="font-size:18px;">/10</span></div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:{col};">{"Excellent" if score>=8 else "Good" if score>=6 else "Fair" if score>=4 else "Poor"} sleeping conditions</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);">Tonight avg: {round(avg_t)}°F · Wind: {round(avg_w)} mph</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.85);">{"<br>".join(tips)}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B16: Gardening advisor ────────────────────────────────────────────────────
+def render_gardening_advisor(temp_f, humidity, rain_pct, wind_mph, uv, t_rain):
+    tips = []
+    should_water = rain_pct < 30 and t_rain < 40 and humidity < 60
+    if should_water: tips.append("🚿 Water your plants today — low rain expected")
+    else: tips.append("🌧️ Skip watering — rain expected to do the job")
+    if temp_f > 90: tips.append("🌡️ Extreme heat — water at dawn, not midday")
+    if wind_mph > 20: tips.append("💨 High winds — stake tall plants and delay spraying")
+    if uv > 7: tips.append("☀️ High UV — check plants for sunscorch")
+    if humidity > 80: tips.append("🍄 High humidity — watch for fungal diseases")
+    if temp_f < 32: tips.append("❄️ Frost risk — cover frost-sensitive plants tonight")
+    if not tips: tips.append("✅ Good gardening conditions — happy planting!")
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🌱 Gardening Advisor</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.9);line-height:1.8;">{"<br>".join(tips)}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B17: Local time display ───────────────────────────────────────────────────
+def render_local_time(local_now, city_name, tz_str):
+    utc_offset = local_now.utcoffset()
+    if utc_offset:
+        total_secs = int(utc_offset.total_seconds())
+        sign = "+" if total_secs >= 0 else "-"
+        h = abs(total_secs) // 3600; m = (abs(total_secs) % 3600) // 60
+        tz_label = f"UTC{sign}{h}" + (f":{m:02d}" if m else "")
+    else:
+        tz_label = "UTC"
+    st.markdown(f"""<div class="glass-card">
+      <div class="box-title">🕐 Local Time in {city_name}</div>
+      <div style="font-size:28px;font-weight:700;color:white;">{local_now.strftime("%I:%M %p")}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);">{local_now.strftime("%A, %B %d %Y")} · {tz_label} · {tz_str.split("/")[-1].replace("_"," ")}</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B18: Currency + weather for travel ───────────────────────────────────────
+def render_currency_weather(unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">💱 Travel: Currency + Weather</p>', unsafe_allow_html=True)
+    with st.expander("Check currency rate for your destination"):
+        c1, c2, c3 = st.columns(3)
+        with c1: dest_city = st.text_input("Destination city", placeholder="e.g. Tokyo", key="curr_city")
+        with c2:
+            currencies = ["USD","EUR","GBP","JPY","AUD","CAD","CHF","CNY","INR","MXN","SGD","HKD","NOK","SEK","DKK","NZD","KRW","BRL","ZAR","AED"]
+            from_curr = st.selectbox("Your currency", currencies, key="from_curr")
+        with c3: to_curr = st.selectbox("Their currency", currencies, index=3, key="to_curr")
+        if st.button("🔍 Check", key="curr_go") and dest_city.strip():
+            with st.spinner("Fetching weather + currency..."):
+                # Fetch weather
+                wx_result = fetch_weather(dest_city.strip(), unit)
+                # Fetch currency via Frankfurter (free, no key)
+                curr_data = None
+                try:
+                    r = requests.get(f"https://api.frankfurter.dev/v2/rates?base={from_curr}&quotes={to_curr}", timeout=6)
+                    curr_data = r.json()
+                except: pass
+                if wx_result[0]:
+                    wx_f2, wx_d2, _, meta2 = wx_result
+                    cur2 = wx_f2["current"]; curd2 = wx_d2["current"]
+                    t2 = round(curd2["temperature_2m"]); cond2 = WMO_CODES.get(cur2["weather_code"], "🌡️")
+                    icon2 = cond2.split()[0]
+                    rate_str = "N/A"
+                    if curr_data and "rates" in curr_data:
+                        rate = curr_data["rates"].get(to_curr, None)
+                        if rate: rate_str = f"1 {from_curr} = {rate:.4f} {to_curr}"
+                    st.markdown(f"""<div class="ai-box">
+                      <div class="box-title">✈️ {meta2['name']}, {meta2['country']}</div>
+                      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px;">
+                        <div>
+                          <div style="font-size:11px;color:rgba(255,255,255,0.5);">Weather</div>
+                          <div style="font-size:22px;font-weight:700;color:white;">{icon2} {t2}{unit}</div>
+                          <div style="font-size:13px;color:rgba(255,255,255,0.7);">{cond2}</div>
+                        </div>
+                        <div>
+                          <div style="font-size:11px;color:rgba(255,255,255,0.5);">Exchange Rate</div>
+                          <div style="font-size:18px;font-weight:700;color:#4ADE80;">{rate_str}</div>
+                          <div style="font-size:10px;color:rgba(255,255,255,0.4);">Via ECB daily rate · Frankfurter API</div>
+                        </div>
+                      </div>
+                    </div>""", unsafe_allow_html=True)
+                else:
+                    st.error("City not found")
+
+
+# ── B19: Sunset time comparison ───────────────────────────────────────────────
+def render_sunset_comparison(ss_fmt, city_name):
+    with st.expander("🌇 Compare sunset time with another city"):
+        other_city = st.text_input("Compare with city:", placeholder="e.g. London", key="sunset_cmp")
+        if st.button("Compare Sunsets", key="ss_go") and other_city.strip():
+            with st.spinner("Fetching..."):
+                res2 = fetch_weather(other_city.strip(), "°F")
+                if res2[0]:
+                    daily2 = res2[0]["daily"]
+                    try:
+                        ss2_raw = daily2.get("sunset", ["",""])[1]
+                        ss2_fmt = datetime.strptime(ss2_raw, "%Y-%m-%dT%H:%M").strftime("%I:%M %p")
+                        ss1 = datetime.strptime(ss_fmt, "%I:%M %p")
+                        ss2 = datetime.strptime(ss2_fmt, "%I:%M %p")
+                        diff_m = abs(int((ss2 - ss1).total_seconds() / 60))
+                        earlier = city_name if ss1 < ss2 else res2[3]["name"]
+                        later   = res2[3]["name"] if ss1 < ss2 else city_name
+                        st.markdown(f"""<div class="glass-card">
+                          <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin:8px 0;">
+                            <div style="text-align:center;"><div style="font-size:11px;color:rgba(255,255,255,0.5);">📍 {city_name}</div><div style="font-size:22px;font-weight:700;color:#FB923C;">{ss_fmt}</div></div>
+                            <div style="text-align:center;"><div style="font-size:11px;color:rgba(255,255,255,0.5);">📍 {res2[3]["name"]}</div><div style="font-size:22px;font-weight:700;color:#FB923C;">{ss2_fmt}</div></div>
+                          </div>
+                          <div style="font-size:13px;color:rgba(255,255,255,0.8);text-align:center;">
+                            🌇 {earlier} has sunset {diff_m} minutes earlier than {later}
+                          </div>
+                        </div>""", unsafe_allow_html=True)
+                    except Exception as e:
+                        st.warning(f"Could not compare: {e}")
+                else:
+                    st.error("City not found")
+
+
+# ── B20: Weather extremes (historical max/min) ────────────────────────────────
+def render_weather_extremes(lat, lon, unit):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🏆 Weather Records This Month</p>', unsafe_allow_html=True)
+    with st.expander("Show historical extremes for this location"):
+        with st.spinner("Fetching 10 years of data..."):
+            try:
+                now = datetime.now()
+                start = datetime(now.year - 10, now.month, 1)
+                end_d = datetime(now.year - 1, now.month, 28)
+                url = (f"https://archive-api.open-meteo.com/v1/archive"
+                       f"?latitude={lat}&longitude={lon}"
+                       f"&start_date={start.strftime('%Y-%m-%d')}"
+                       f"&end_date={end_d.strftime('%Y-%m-%d')}"
+                       f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
+                       f"&temperature_unit={'fahrenheit' if unit=='°F' else 'celsius'}"
+                       f"&timezone=auto")
+                data = requests.get(url, timeout=12).json()
+                if "daily" not in data: st.warning("Data unavailable"); return
+                highs  = [h for h in data["daily"]["temperature_2m_max"] if h is not None]
+                lows   = [l for l in data["daily"]["temperature_2m_min"]  if l is not None]
+                precip = [p for p in data["daily"]["precipitation_sum"]   if p is not None]
+                rec_hi  = round(max(highs), 1)  if highs  else "N/A"
+                rec_lo  = round(min(lows),  1)  if lows   else "N/A"
+                rec_wet = round(max(precip), 1) if precip else "N/A"
+                avg_hi  = round(sum(highs) / len(highs), 1) if highs else "N/A"
+                st.markdown(f"""<div class="glass-card">
+                  <div class="box-title">📊 Historical extremes — past 10 years, this month</div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:8px;">
+                    <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Record High</div><div style="font-size:24px;font-weight:700;color:#EF4444;">{rec_hi}{unit}</div></div>
+                    <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Record Low</div><div style="font-size:24px;font-weight:700;color:#60A5FA;">{rec_lo}{unit}</div></div>
+                    <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Avg High</div><div style="font-size:24px;font-weight:700;color:#4ADE80;">{avg_hi}{unit}</div></div>
+                    <div style="text-align:center;"><div style="font-size:10px;color:rgba(255,255,255,0.5);">Wettest Day</div><div style="font-size:24px;font-weight:700;color:#93C5FD;">{rec_wet} mm</div></div>
+                  </div>
+                </div>""", unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"Could not load extremes: {str(e)[:60]}")
+
+
+# ── B21: Skeleton loading CSS ─────────────────────────────────────────────────
+SKELETON_CSS = """
+<style>
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.08) 25%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.08) 75%);
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+</style>
+"""
+
+def render_skeleton():
+    st.markdown(SKELETON_CSS, unsafe_allow_html=True)
+    st.markdown("""
+    <div class="skeleton" style="height:180px;"></div>
+    <div class="skeleton" style="height:80px;"></div>
+    <div class="skeleton" style="height:80px;"></div>
+    <div style="display:flex;gap:12px;">
+      <div class="skeleton" style="height:80px;flex:1;"></div>
+      <div class="skeleton" style="height:80px;flex:1;"></div>
+      <div class="skeleton" style="height:80px;flex:1;"></div>
+      <div class="skeleton" style="height:80px;flex:1;"></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ── B22: Fetch with retry ─────────────────────────────────────────────────────
+def fetch_weather_with_retry(city, unit, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            result = fetch_weather(city, unit)
+            if result[0] is not None:
+                return result
+            if attempt < max_retries - 1:
+                import time; time.sleep(1)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            import time; time.sleep(1)
+    return None, None, None, None
+
+
+# ── B23: QR code generator ────────────────────────────────────────────────────
+def render_qr_code(city_name):
+    import urllib.parse
+    city_encoded = urllib.parse.quote(city_name)
+    # Use QuickChart.io — free, no API key needed
+    qr_url = f"https://quickchart.io/qr?text=NimbusAI%20weather%20for%20{city_encoded}&size=180&dark=ffffff&light=00000000"
+    app_url = f"https://share.streamlit.io/?city={city_encoded}"
+    st.markdown(f"""<div class="glass-card" style="text-align:center;">
+      <div class="box-title">📱 QR Code — Share This City's Weather</div>
+      <img src="{qr_url}" style="width:150px;height:150px;margin:10px auto;display:block;border-radius:10px;background:rgba(255,255,255,0.1);padding:8px;" alt="QR Code for {city_name}"/>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:6px;">Scan to open NimbusAI for {city_name}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:3px;">via QuickChart.io · Free · No API key</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ── B24: Unit preference memory ───────────────────────────────────────────────
+def remember_unit_preference(unit):
+    """Store unit preference so it persists across searches in the session."""
+    st.session_state["preferred_unit"] = unit
+
+def get_preferred_unit():
+    return st.session_state.get("preferred_unit", "°F")
+
+
+# ── B25: Print-friendly weather report ───────────────────────────────────────
+def render_print_report(city_name, country, temp_d, unit, condition_str,
+                         hi_d, lo_d, humidity, wind_mph, wind_dir_str,
+                         rain_pct, uv, aqi_text, sr_fmt, ss_fmt, fgi, fgi_lbl):
+    import streamlit.components.v1 as comp
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🖨️ Print Weather Report</p>', unsafe_allow_html=True)
+    with st.expander("Generate printable daily report"):
+        date_str = datetime.now().strftime("%A, %B %d, %Y")
+        comp.html(f"""
+        <style>
+        body {{ margin:0; font-family: Georgia, serif; background: white; color: #1a1a2e; }}
+        .report {{ max-width: 600px; margin: 0 auto; padding: 24px; border: 2px solid #1a6eff; border-radius: 12px; }}
+        .header {{ text-align:center; border-bottom: 1px solid #ddd; padding-bottom: 16px; margin-bottom: 16px; }}
+        .title {{ font-size: 24px; font-weight: bold; color: #1a6eff; }}
+        .date {{ font-size: 13px; color: #666; margin-top: 4px; }}
+        .temp {{ font-size: 48px; font-weight: 900; color: #1a1a2e; text-align:center; margin: 16px 0 8px; }}
+        .cond {{ text-align:center; font-size: 16px; color: #444; margin-bottom: 16px; }}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }}
+        .stat {{ background: #f8f9ff; border-radius: 8px; padding: 10px; text-align: center; }}
+        .stat-label {{ font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.1em; }}
+        .stat-val {{ font-size: 18px; font-weight: bold; color: #1a1a2e; margin-top: 4px; }}
+        .footer {{ text-align:center; font-size: 11px; color: #aaa; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }}
+        .print-btn {{ background:#1a6eff; color:white; border:none; border-radius:8px; padding:10px 24px;
+                      font-size:14px; font-weight:600; cursor:pointer; display:block; margin: 16px auto 0; }}
+        @media print {{
+          .print-btn {{ display:none; }}
+          body {{ background: white !important; }}
+        }}
+        </style>
+        <div class="report" id="rpt">
+          <div class="header">
+            <div class="title">🌤️ NimbusAI Daily Weather Report</div>
+            <div class="date">📍 {city_name}, {country} · {date_str}</div>
+          </div>
+          <div class="temp">{round(temp_d)}{unit}</div>
+          <div class="cond">{condition_str}</div>
+          <div class="grid">
+            <div class="stat"><div class="stat-label">🔴 High</div><div class="stat-val">{hi_d}{unit}</div></div>
+            <div class="stat"><div class="stat-label">🔵 Low</div><div class="stat-val">{lo_d}{unit}</div></div>
+            <div class="stat"><div class="stat-label">💧 Humidity</div><div class="stat-val">{humidity}%</div></div>
+            <div class="stat"><div class="stat-label">💨 Wind</div><div class="stat-val">{round(wind_mph)} mph {wind_dir_str}</div></div>
+            <div class="stat"><div class="stat-label">🌧️ Rain Chance</div><div class="stat-val">{rain_pct}%</div></div>
+            <div class="stat"><div class="stat-label">🌞 UV Index</div><div class="stat-val">{round(uv)}/11</div></div>
+            <div class="stat"><div class="stat-label">💨 Air Quality</div><div class="stat-val">{aqi_text.split()[0] if aqi_text!='N/A' else 'N/A'}</div></div>
+            <div class="stat"><div class="stat-label">🌅 Sunrise</div><div class="stat-val">{sr_fmt}</div></div>
+            <div class="stat"><div class="stat-label">🌇 Sunset</div><div class="stat-val">{ss_fmt}</div></div>
+          </div>
+          <div class="stat" style="text-align:center;"><div class="stat-label">😊 Feel-Good Index</div><div class="stat-val">{fgi}/100 — {fgi_lbl}</div></div>
+          <div class="footer">Generated by NimbusAI · {date_str} · Open-Meteo API · Free weather data</div>
+          <button class="print-btn" onclick="window.print()">🖨️ Print This Report</button>
+        </div>
+        """, height=620)
+
+
 # ── Session state ──────────────────────────────────────────────────────────────
 for k,v in [("history",[]),("city_input",""),("dark_mode",False),
              ("last_updated",None),("outfit_memory",{})]:
@@ -1956,6 +2682,7 @@ fetch_city=city_typed.strip()
 
 # ── Main display ───────────────────────────────────────────────────────────────
 if fetch_city:
+    st.markdown(SKELETON_CSS, unsafe_allow_html=True)
     with st.spinner("Fetching real weather..."):
         # N20+N21: Check URL param + use cache
         set_city_in_url(fetch_city)
@@ -2282,6 +3009,56 @@ if fetch_city:
         # N23: Auto-refresh check
         if check_auto_refresh(): st.rerun()
 
+        # ── Batch 2 features B1–B25 ──────────────────────────────────────────
+        # B1: Time-of-day sky gradient
+        inject_time_sky(local_now, sky_bg)
+        # B2: Card rain overlay
+        inject_card_rain(sky_bg)
+        # B3+B4: Thermometer + feels comparison (side by side)
+        bc1, bc2 = st.columns([1, 2])
+        with bc1: st.markdown(thermometer_svg(temp_f, unit, temp_d), unsafe_allow_html=True)
+        with bc2: render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit)
+        # B5: Day progress bar
+        render_day_progress(local_now, sr_fmt, ss_fmt)
+        # B6: Wind gust vs sustained
+        render_wind_detail(wind_mph, gusts_mph, wind_dir_str)
+        # B7: Dew point
+        render_dew_point(temp_f, humidity, unit)
+        # B8: Visibility gauge
+        st.markdown(visibility_gauge_svg(vis_km), unsafe_allow_html=True)
+        # B9: Precipitation mm
+        render_precip_forecast(lat, lon, unit)
+        # B10: Forecast confidence
+        render_confidence_badges(daily_f)
+        # B11: Windows advisor
+        render_windows_advisor(temp_f, aqi_text, grass_pollen, tree_pollen, wind_mph, condition_str)
+        # B12: Allergy alert
+        render_allergy_alert(grass_pollen, tree_pollen, aqi_text, wind_mph)
+        # B13: Best day
+        render_best_day(daily_f, daily_d, unit)
+        # B14: Running advisor
+        render_running_advisor(temp_f, humidity, wind_mph, aqi_text, unit, temp_d)
+        # B15: Sleep forecast
+        render_sleep_forecast(hourly_temps_f, hourly_wind, hour_labels)
+        # B16: Gardening
+        render_gardening_advisor(temp_f, humidity, rain_pct, wind_mph, uv, t_rain)
+        # B17: Local time
+        render_local_time(local_now, city_name, tz_str)
+        # B18: Currency + weather
+        render_currency_weather(unit)
+        # B19: Sunset comparison
+        render_sunset_comparison(ss_fmt, city_name)
+        # B20: Weather extremes
+        render_weather_extremes(lat, lon, unit)
+        # B23: QR code
+        render_qr_code(city_name)
+        # B24: Remember unit preference
+        remember_unit_preference(unit)
+        # B25: Print report
+        render_print_report(city_name, country, temp_d, unit, condition_str,
+                            hi_d, lo_d, humidity, wind_mph, wind_dir_str,
+                            rain_pct, uv, aqi_text, sr_fmt, ss_fmt, fgi, fgi_lbl)
+
 # ── Favourites + PWA always visible ───────────────────────────────────────────
 # N20: offline cache — integrated into fetch call
 # N21: URL param — read at top
@@ -2292,4 +3069,5 @@ _kb.html(KEYBOARD_JS, height=0, scrolling=False)
 render_favourites()
 inject_pwa()
 
-    
+
+
