@@ -1,4 +1,4 @@
-mport streamlit as st
+import streamlit as st
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
