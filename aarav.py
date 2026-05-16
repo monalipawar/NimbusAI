@@ -638,8 +638,29 @@ def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly
         for i in range(24):
             bg = "rgba(255,255,255,0.12)" if i == now_h else "transparent"
             t = hourly_temps_d[i]; f = hourly_feels_d[i]; r = hourly_rain_vals[i]; w = hourly_wind[i]
-            wear = "🧥" if t < 50 else "🧶" if t < 65 else "👕" if t < 80 else "🩳"
-            if r > 50: wear += "☔"
+            # Written outfit description
+            if t < 35:
+                wear = "Heavy coat, thermals, gloves, scarf"
+            elif t < 50:
+                wear = "Winter jacket, jeans, warm boots"
+            elif t < 60:
+                wear = "Light jacket or fleece, jeans"
+            elif t < 65:
+                wear = "Hoodie or sweater, jeans"
+            elif t < 72:
+                wear = "Light hoodie, casual pants"
+            elif t < 80:
+                wear = "T-shirt, light pants or jeans"
+            elif t < 88:
+                wear = "Shorts, light t-shirt, sunglasses"
+            else:
+                wear = "Shorts, tank top, sunscreen, hat"
+            if r > 60:
+                wear += " + umbrella & waterproof shoes"
+            elif r > 35:
+                wear += " + umbrella"
+            if w > 20:
+                wear += " + windbreaker"
             html += f'<tr style="background:{bg};border-bottom:1px solid rgba(255,255,255,0.06);">'
             html += f'<td style="padding:6px 10px;color:{"#FCD34D" if i==now_h else "white"};font-weight:{"700" if i==now_h else "400"};">{"▶ " if i==now_h else ""}{hour_labels[i]}</td>'
             html += f'<td style="padding:6px 10px;text-align:center;color:white;">{round(t)}{unit}</td>'
