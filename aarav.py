@@ -3092,3 +3092,317 @@ inject_pwa()
 
 
 
+# =========================================================
+# NIMBUS AI — DROP-IN WEATHER FEATURES PACK
+# Paste this into another weather app
+# =========================================================
+
+
+# =========================================================
+# AI WEATHER SUMMARY
+# =========================================================
+
+def ai_weather_summary(temp, condition, humidity, wind):
+
+    if "rain" in condition.lower():
+        return "Today feels like a cozy stay-inside-and-watch-the-rain kind of day."
+
+    if temp > 80:
+        return "Warm sunshine and bright skies make today feel perfect for cold drinks outside."
+
+    if temp < 45:
+        return "Cold crisp air makes today feel like a hoodie-and-hot-chocolate day."
+
+    if humidity > 80:
+        return "The air feels thick and humid today."
+
+    return "Today feels like a perfect coffee-on-the-porch morning."
+
+
+# =========================================================
+# WEATHER ANOMALY DETECTOR
+# =========================================================
+
+def anomaly_detector(current_temp, historical_avg):
+
+    diff = current_temp - historical_avg
+
+    if diff >= 15:
+        return "🔥 Much hotter than normal"
+
+    elif diff <= -15:
+        return "❄️ Much colder than normal"
+
+    else:
+        return "✅ Near normal temperatures"
+
+
+# =========================================================
+# DROUGHT / SOIL DRYNESS
+# =========================================================
+
+def drought_index(rain_mm, humidity):
+
+    if rain_mm < 2 and humidity < 40:
+        return "🟤 Dry Soil Conditions"
+
+    elif rain_mm > 10:
+        return "🟢 Soil Moisture High"
+
+    return "🟡 Moderate Soil Moisture"
+
+
+# =========================================================
+# HAIR / FRIZZ FORECAST
+# =========================================================
+
+def frizz_forecast(humidity):
+
+    if humidity > 85:
+        return "💇 Extreme frizz risk"
+
+    elif humidity > 70:
+        return "💇 Moderate frizz risk"
+
+    return "✅ Hair-friendly weather"
+
+
+# =========================================================
+# DOG WALK ADVISOR
+# =========================================================
+
+def dog_walk_score(temp, rain, uv, pollen):
+
+    score = 100
+
+    if temp > 90 or temp < 30:
+        score -= 30
+
+    if rain > 50:
+        score -= 25
+
+    if uv > 8:
+        score -= 20
+
+    if pollen > 8:
+        score -= 20
+
+    if score >= 80:
+        return "🐶 Perfect dog walk weather"
+
+    elif score >= 60:
+        return "🐕 Decent walking weather"
+
+    return "⚠️ Not ideal for long walks"
+
+
+# =========================================================
+# CAR WASH RECOMMENDATION
+# =========================================================
+
+def car_wash_advice(rain_next_48h):
+
+    if rain_next_48h:
+        return "🚫 Skip the car wash — rain coming soon"
+
+    return "🚗 Great time for a car wash"
+
+
+# =========================================================
+# LAUNDRY DRYING FORECAST
+# =========================================================
+
+def laundry_forecast(temp, humidity, rain_chance):
+
+    if rain_chance > 40:
+        return "👕 Bad drying weather"
+
+    if humidity < 60 and temp > 70:
+        return "☀️ Perfect outdoor drying weather"
+
+    return "🟡 Okay drying conditions"
+
+
+# =========================================================
+# BBQ PLANNER
+# =========================================================
+
+def bbq_planner(temp, rain, wind):
+
+    if 65 <= temp <= 85 and rain < 20 and wind < 15:
+        return "🍔 Excellent BBQ weather"
+
+    return "🌧️ Not ideal for grilling"
+
+
+# =========================================================
+# SCHOOL RECESS ADVISOR
+# =========================================================
+
+def recess_advisor(temp, rain):
+
+    if rain > 60:
+        return "🏫 Indoor recess recommended"
+
+    if temp < 25:
+        return "🥶 Too cold for outdoor recess"
+
+    return "⚽ Great outdoor recess weather"
+
+
+# =========================================================
+# STARGAZING SCORE
+# =========================================================
+
+def stargazing_score(cloud_cover, moon_phase):
+
+    score = 100
+
+    score -= cloud_cover
+
+    if moon_phase > 70:
+        score -= 25
+
+    if score >= 75:
+        return "🌌 Incredible stargazing tonight"
+
+    elif score >= 50:
+        return "✨ Decent night sky visibility"
+
+    return "☁️ Poor stargazing conditions"
+
+
+# =========================================================
+# WEATHER TRIVIA
+# =========================================================
+
+weather_trivia = [
+    "🌪️ A tornado can reach winds over 300 mph.",
+    "⚡ Lightning is hotter than the surface of the sun.",
+    "☁️ Clouds can weigh millions of pounds.",
+    "🌈 Rainbows are full circles — we usually only see half."
+]
+
+def get_weather_trivia():
+    return random.choice(weather_trivia)
+
+
+# =========================================================
+# WEATHER HISTORY FACT
+# =========================================================
+
+history_facts = [
+    "📜 On this day: one of the hottest temperatures ever recorded reached 134°F.",
+    "📜 On this day: a historic snowstorm shut down major cities.",
+    "📜 On this day: record rainfall caused massive flooding."
+]
+
+def weather_history_fact():
+    return random.choice(history_facts)
+
+
+# =========================================================
+# MOVIE RECOMMENDER
+# =========================================================
+
+def weather_movie_recommendation(condition):
+
+    if "rain" in condition.lower():
+        return "🎬 Perfect rainy-day movie: Harry Potter"
+
+    if "storm" in condition.lower():
+        return "🎬 Perfect storm movie: Twister"
+
+    if "snow" in condition.lower():
+        return "🎬 Cozy snow movie: Frozen"
+
+    return "🎬 Great day for an adventure movie"
+
+
+# =========================================================
+# WEATHER HAIKU
+# =========================================================
+
+def weather_haiku(condition):
+
+    haikus = [
+        "Soft clouds drift slowly\nMorning rain taps on windows\nCool winds hum softly",
+
+        "Golden sunlight glows\nWarm breeze dances through the trees\nSummer whispers calm",
+
+        "Thunder shakes the sky\nSilver rain floods quiet streets\nNight flickers with light"
+    ]
+
+    return random.choice(haikus)
+
+
+# =========================================================
+# TURBULENCE RISK
+# =========================================================
+
+def turbulence_risk(wind_speed, pressure):
+
+    if wind_speed > 35:
+        return "✈️ High turbulence risk"
+
+    if pressure < 990:
+        return "✈️ Moderate turbulence possible"
+
+    return "✅ Smooth flying conditions"
+
+
+# =========================================================
+# BEACH SCORE
+# =========================================================
+
+def beach_score(temp, uv, wind):
+
+    score = 100
+
+    if temp < 70:
+        score -= 30
+
+    if wind > 25:
+        score -= 20
+
+    if uv > 10:
+        score -= 15
+
+    if score >= 80:
+        return "🏖️ Amazing beach weather"
+
+    return "🌊 Fair beach conditions"
+
+
+# =========================================================
+# CAMPING SCORE
+# =========================================================
+
+def camping_score(temp, rain, wind):
+
+    if rain > 50:
+        return "⛺ Poor camping weather"
+
+    if 55 <= temp <= 75 and wind < 15:
+        return "🔥 Excellent camping night"
+
+    return "🟡 Decent camping conditions"
+
+
+# =========================================================
+# SAMPLE USAGE
+# =========================================================
+
+"""
+summary = ai_weather_summary(72, "Sunny", 40, 8)
+
+st.write(summary)
+
+st.write(frizz_forecast(85))
+
+st.write(dog_walk_score(75, 10, 3, 2))
+
+st.write(get_weather_trivia())
+
+st.write(weather_haiku("Rain"))
+"""
