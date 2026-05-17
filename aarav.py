@@ -1,4 +1,23 @@
 import streamlit as st
+# =========================================================
+# AI WEATHER SUMMARY FUNCTION
+# =========================================================
+
+def ai_weather_summary(temp, condition, humidity, wind):
+
+    if "rain" in condition.lower():
+        return "🌧️ Cozy rainy weather today."
+
+    if temp > 85:
+        return "☀️ Hot sunny weather today."
+
+    if temp < 45:
+        return "🥶 Cold crisp weather today."
+
+    if humidity > 80:
+        return "💧 Very humid conditions today."
+
+    return "☕ Perfect coffee-on-the-porch weather."
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
