@@ -2027,7 +2027,7 @@ def thermometer_svg(temp_f, unit, temp_d):
         <text x="42" y="14" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">120°</text>
         <text x="42" y="54" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">60°</text>
         <text x="42" y="94" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">0°</text>
-     </script>""",(height=60)
+    height=60)
 if st.session_state.history:
     st.markdown(f'<div class="chip-row">'+''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)+'</div>',unsafe_allow_html=True)
 
