@@ -71,7 +71,19 @@ st.markdown("""
 @media(max-width:600px){ .hero-temp { font-size:56px !important; } .forecast-row { flex-wrap:wrap !important; } .forecast-day { min-width:56px !important; } }
 </style></div>
 """, unsafe_allow_html=True)
-
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(
+        160deg,
+        #020617,
+        #0f172a,
+        #1e293b
+    );
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
 # ── Constants ──────────────────────────────────────────────────────────────────
 WMO_CODES = {
     0:"☀️ Clear sky",1:"🌤️ Mainly clear",2:"⛅ Partly cloudy",3:"☁️ Overcast",
