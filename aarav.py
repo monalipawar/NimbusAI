@@ -3182,22 +3182,39 @@ elif theme == "Midnight":
 
 
     # ═══════════════════════════════════════
-# 🎮 WEATHER GUESSING GAME
+# 🎮 WEATHER GAME GATE
 # ═══════════════════════════════════════
 
 st.markdown("---")
-st.markdown("## 🎮 Weather Guessing Game")
+st.markdown("## 🎮 Play Weather Game?")
 
 play_game = st.radio(
-    "Do you want to play the weather game first?",
+    "Choose One",
     ["Yes", "No"]
 )
 
-# ───────────────────────────────────────
-# IF YES → PLAY GAME FIRST
-# ───────────────────────────────────────
+# ═══════════════════════════════════════
+# IF NO → SKIP GAME
+# ═══════════════════════════════════════
 
-if play_game == "Yes":
+if play_game == "No":
+
+    st.success("🌤️ Weather Unlocked!")
+
+    city = st.text_input(
+        "📍 Type Your Location"
+    )
+
+    if city:
+
+        # PUT YOUR WEATHER CODE HERE
+        st.write(f"Showing weather for {city}")
+
+# ═══════════════════════════════════════
+# IF YES → PLAY GAME FIRST
+# ═══════════════════════════════════════
+
+else:
 
     weather_options = [
         ("☀️", "Sunny"),
@@ -3219,50 +3236,40 @@ if play_game == "Yes":
             border-radius:20px;
             background:rgba(255,255,255,0.08);
         ">
-            <div style="font-size:80px;">{emoji}</div>
-            <div style="font-size:22px;">
-                Guess The Weather
-            </div>
+            <div style="font-size:90px;">{emoji}</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
     guess = st.radio(
-        "Choose One",
+        "Guess The Weather",
         ["Sunny", "Rainy", "Snowy", "Stormy"]
     )
 
-    if st.button("🎯 Submit Guess"):
+    if st.button("🎯 Submit"):
 
         if guess == answer:
-            st.success("🎉 Correct!")
+
+            st.success("🎉 Correct! Weather Unlocked!")
+
+            city = st.text_input(
+                "📍 Type Your Location"
+            )
+
+            if city:
+
+                # PUT YOUR WEATHER CODE HERE
+                st.write(f"Showing weather for {city}")
 
         else:
+
             st.error(f"❌ Wrong! It was {answer}")
 
-        st.markdown("---")
-        st.markdown("## 🌤️ Weather")
-
-        # PUT YOUR NORMAL WEATHER CODE HERE
-
     if st.button("🔄 New Round"):
+
         st.session_state.game_weather = random.choice(weather_options)
         st.rerun()
-
-# ───────────────────────────────────────
-# IF NO → SKIP GAME
-# ───────────────────────────────────────
-
-else:
-
-    st.markdown("---")
-    st.markdown("## 🌤️ Weather")
-
-    # PUT YOUR NORMAL WEATHER CODE HERE
-
-
-
     # ═══════════════════════════════════════
 # 🎨 SIMPLE LOGO MAKER
 # ═══════════════════════════════════════
