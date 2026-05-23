@@ -1,4 +1,23 @@
 import streamlit as st
+
+st.set_page_config(
+    page_title="NimbusAI",
+    page_icon="🌤️",
+    layout="centered"
+) 
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(
+        160deg,
+        #020617,
+        #0f172a,
+        #1e293b
+    );
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
