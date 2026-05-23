@@ -3323,15 +3323,28 @@ st.markdown("## 🎨 Quick Logo Creator")
 
 logo_text = st.text_input(
     "Business/App Name",
-    placeholder="NimbusAI"
+    placeholder="NimbusAI",
+    key="logo_text_input"
 )
 
 logo_color = st.color_picker(
     "Pick Logo Color",
-    "#38b6ff"
+    "#38b6ff",
+    key="logo_color_picker"
+)
+
+logo_emoji = st.selectbox(
+    "Choose Logo Emoji",
+    ["⚡", "🚀", "🌟", "🔥", "💎", "🎯", "🌊", "🍀", "🦋", "🐉",
+     "🌈", "🏆", "💡", "🎨", "🔮", "🦅", "🌙", "☀️", "❄️", "🎵",
+     "None"],
+    key="logo_emoji_selectbox"
 )
 
 if logo_text:
+    # Build prefix — skip if "None" selected
+    prefix = "" if logo_emoji == "None" else f"{logo_emoji} "
+
     st.markdown(f"""
     <div style="
         background:rgba(255,255,255,0.1);
@@ -3347,7 +3360,7 @@ if logo_text:
             color:{logo_color};
             letter-spacing:2px;
         ">
-            ⚡ {logo_text}
+            {prefix}{logo_text}
         </div>
     </div>
     """, unsafe_allow_html=True)
