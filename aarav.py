@@ -2041,7 +2041,7 @@ fetch_city=city_typed.strip()
     actual_pct = 60; feels_pct = round(actual_pct + (diff / 30) * 40)
     feels_pct = max(10, min(90, feels_pct))
     st.markdown(f"""<div class="glass-card">
-      <div class="box-title">🌡️ Actual vs Feels Like</div>
+      <div class="box-title">Actual vs Feels Like</div>
       <div style="display:flex;align-items:center;gap:20px;margin:10px 0;flex-wrap:wrap;">
         <div style="flex:1;text-align:center;">
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">ACTUAL</div>
