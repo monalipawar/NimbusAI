@@ -6,6 +6,10 @@ import math, random
 
 st.set_page_config(page_title="NimbusAI", page_icon="🌤️", layout="centered")
 
+st.title("🌤️ NimbusAI")
+
+st.write("Cool AI weather app")
+
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <div style="display:none"><style>
