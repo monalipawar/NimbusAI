@@ -3090,3 +3090,142 @@ _kb.html(KEYBOARD_JS, height=0, scrolling=False)
 render_favourites()
 inject_pwa()
 
+# ═══════════════════════════════════════
+# 🎨 PREMIUM THEMES
+# ═══════════════════════════════════════
+
+st.markdown("---")
+st.markdown("## 🎨 Theme Pack")
+
+theme = st.selectbox(
+    "Choose Theme",
+    [
+        "Default Sky",
+        "Cyberpunk",
+        "Sunset Glow",
+        "Ocean Blue",
+        "Midnight",
+    ]
+)
+
+if theme == "Cyberpunk":
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(160deg,#ff00cc,#3333ff);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+elif theme == "Sunset Glow":
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(160deg,#ff9966,#ff5e62);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+elif theme == "Ocean Blue":
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(160deg,#2193b0,#6dd5ed);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+elif theme == "Midnight":
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(160deg,#0f2027,#203a43,#2c5364);
+    }
+    </style>
+    """, unsafe_allow_html=True) 
+
+
+
+    # ═══════════════════════════════════════
+# 🎮 WEATHER GUESSING GAME
+# ═══════════════════════════════════════
+
+st.markdown("---")
+st.markdown("## 🎮 Weather Guessing Game")
+
+weather_options = [
+    ("☀️", "Sunny"),
+    ("🌧️", "Rainy"),
+    ("❄️", "Snowy"),
+    ("⛈️", "Stormy"),
+]
+
+if "game_weather" not in st.session_state:
+    st.session_state.game_weather = random.choice(weather_options)
+
+emoji, answer = st.session_state.game_weather
+
+st.markdown(
+    f"""
+    <div class="glass-card" style="text-align:center;">
+        <div style="font-size:70px;">{emoji}</div>
+        <div>Guess the weather!</div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+guess = st.radio(
+    "Your Guess",
+    ["Sunny", "Rainy", "Snowy", "Stormy"]
+)
+
+if st.button("🎯 Check Answer"):
+    if guess == answer:
+        st.success("🎉 Correct!")
+    else:
+        st.error(f"❌ Nope! It was {answer}")
+
+if st.button("🔄 New Round"):
+    st.session_state.game_weather = random.choice(weather_options)
+    st.rerun()
+
+
+
+    # ═══════════════════════════════════════
+# 🎨 SIMPLE LOGO MAKER
+# ═══════════════════════════════════════
+
+st.markdown("---")
+st.markdown("## 🎨 Quick Logo Creator")
+
+logo_text = st.text_input(
+    "Business/App Name",
+    placeholder="NimbusAI"
+)
+
+logo_color = st.color_picker(
+    "Pick Logo Color",
+    "#38b6ff"
+)
+
+if logo_text:
+    st.markdown(f"""
+    <div style="
+        background:rgba(255,255,255,0.1);
+        padding:40px;
+        border-radius:20px;
+        text-align:center;
+        margin-top:15px;
+        border:1px solid rgba(255,255,255,0.2);
+    ">
+        <div style="
+            font-size:48px;
+            font-weight:900;
+            color:{logo_color};
+            letter-spacing:2px;
+        ">
+            ⚡ {logo_text}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
