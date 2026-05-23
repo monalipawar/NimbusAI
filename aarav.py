@@ -4,7 +4,7 @@ st.set_page_config(
     page_title="NimbusAI",
     page_icon="🌤️",
     layout="centered"
-
+)
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
