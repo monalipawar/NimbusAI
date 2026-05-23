@@ -5,17 +5,90 @@ st.set_page_config(
     page_icon="🌤️",
     layout="centered"
 ) 
-st.markdown("""
+# ═══════════════════════════════════════
+# 🎨 THEME PACK
+# ═══════════════════════════════════════
+
+st.markdown("## 🎨 Theme Pack")
+
+theme = st.selectbox(
+    "Choose Theme",
+    [
+        "Default",
+        "Cyberpunk",
+        "Sunset",
+        "Ocean",
+        "Midnight"
+    ]
+)
+
+# DEFAULT
+bg = """
+linear-gradient(
+160deg,
+#0f172a,
+#1e293b,
+#334155
+)
+"""
+
+# CYBERPUNK
+if theme == "Cyberpunk":
+
+    bg = """
+    linear-gradient(
+    160deg,
+    #ff00cc,
+    #3333ff,
+    #00ffee
+    )
+    """
+
+# SUNSET
+elif theme == "Sunset":
+
+    bg = """
+    linear-gradient(
+    160deg,
+    #ff9966,
+    #ff5e62,
+    #ffcc70
+    )
+    """
+
+# OCEAN
+elif theme == "Ocean":
+
+    bg = """
+    linear-gradient(
+    160deg,
+    #2193b0,
+    #6dd5ed,
+    #38bdf8
+    )
+    """
+
+# MIDNIGHT
+elif theme == "Midnight":
+
+    bg = """
+    linear-gradient(
+    160deg,
+    #020617,
+    #0f172a,
+    #000000
+    )
+    """
+
+# APPLY THEME
+st.markdown(f"""
 <style>
-.stApp {
-    background: linear-gradient(
-        160deg,
-        #020617,
-        #0f172a,
-        #1e293b
-    );
+
+.stApp {{
+    background: {bg};
     color: white;
-}
+}}
+
 </style>
 """, unsafe_allow_html=True)
 import requests
