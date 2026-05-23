@@ -2027,23 +2027,16 @@ def thermometer_svg(temp_f, unit, temp_d):
         <text x="42" y="14" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">120°</text>
         <text x="42" y="54" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">60°</text>
         <text x="42" y="94" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">0°</text>
-      </svg>
-      <div style="font-size:20px;font-weight:700;color:{col};margin-top:6px;">{round(temp_d)}{unit}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.5);">{"Freezing" if temp_f<32 else "Cold" if temp_f<50 else "Cool" if temp_f<65 else "Comfortable" if temp_f<77 else "Warm" if temp_f<90 else "Hot"}</div>
-    </div>"""
+     </script>""",height=60)
+if st.session_state.history:
+    st.markdown(f'<div class="chip-row">'+''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)+'</div>',unsafe_allow_html=True)
 
-
-# ── B4: Feels-like vs actual comparison ──────────────────────────────────────
-def render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit):
-    diff = feels_f - temp_f
-    if diff < -3:
-        reason = f"🌬️ Wind chill — {round(wind_mph)} mph winds making it feel {abs(round(diff))}° colder"
-        bar_col = "#60A5FA"
-    elif diff > 3:
-        reason = f"💧 Humidity — {humidity}% moisture trapping heat, feels {round(diff)}° warmer"
-        bar_col = "#FB923C"
-    else:
-        reason = "✅ Feels very close to actual — calm winds and comfortable humidity"
+render_autocomplete_search()
+saved_city = st.query_params.get("city", "")
+city_typed = st.text_input("",placeholder="Or type below and press Enter...",label_visibility="collapsed",value=st.session_state.get("city_input", saved_city),key="main_city_input")
+if city_typed.strip():
+    st.query_params["city"] = city_typed.strip()
+fetch_city=city_typed.strip()
         bar_col = "#4ADE80"
     actual_pct = 60; feels_pct = round(actual_pct + (diff / 30) * 40)
     feels_pct = max(10, min(90, feels_pct))
