@@ -2735,7 +2735,6 @@ if st.session_state.history:
 # N24: Autocomplete search
 render_autocomplete_search()
 # N24: Autocomplete search
-render_autocomplete_search()
 saved_city = st.query_params.get("city", "")
 city_typed = st.text_input("",placeholder="Or type below and press Enter...",label_visibility="collapsed",value=st.session_state.get("city_input", saved_city),key="main_city_input")
 if city_typed.strip():
