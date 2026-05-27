@@ -2047,7 +2047,7 @@ fetch_city=city_typed.strip()
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">ACTUAL</div>
           <div style="font-size:36px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
         </div>
-        <div style="font-size:28px;">→</div>
+        <div style="font-size:28px;"></div>
         <div style="flex:1;text-align:center;">
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">FEELS LIKE</div>
           <div style="font-size:36px;font-weight:900;color:{bar_col};">{round(feels_d)}{unit}</div>
