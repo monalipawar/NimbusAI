@@ -2078,9 +2078,9 @@ def render_day_progress(local_now, sunrise_str, sunset_str):
         else:
             msg = "🌙 After sunset — night time"
         st.markdown(f"""<div class="glass-card">
-          <div class="box-title">🌅 Day Progress</div>
+          <div class="box-title"> Day Progress</div>
           <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:6px;">
-            <span>🌅 {sunrise_str}</span><span>{pct}% of daylight</span><span>🌇 {sunset_str}</span>
+            <span> {sunrise_str}</span><span>{pct}% of daylight</span><span> {sunset_str}</span>
           </div>
           <div style="background:rgba(255,255,255,0.1);border-radius:20px;height:14px;overflow:hidden;position:relative;">
             <div style="height:14px;width:{pct}%;background:linear-gradient(90deg,#FF6B35,#FFD700,#87CEEB);border-radius:20px;transition:width 1s;"></div>
