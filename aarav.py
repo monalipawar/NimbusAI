@@ -1,20 +1,10 @@
 import streamlit as st
-
-st.set_page_config(
-    page_title="NimbusAI",
-    page_icon="🌤️",
-    layout="centered"
-)
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import math, random
 
 st.set_page_config(page_title="NimbusAI", page_icon="🌤️", layout="centered")
-
-st.title("🌤️ NimbusAI")
-
-st.write("Cool AI weather app")
 
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
@@ -77,19 +67,7 @@ st.markdown("""
 @media(max-width:600px){ .hero-temp { font-size:56px !important; } .forecast-row { flex-wrap:wrap !important; } .forecast-day { min-width:56px !important; } }
 </style></div>
 """, unsafe_allow_html=True)
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(
-        160deg,
-        #020617,
-        #0f172a,
-        #1e293b
-    );
-    color: white;
-}
-</style>
-""", unsafe_allow_html=True)
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 WMO_CODES = {
     0:"☀️ Clear sky",1:"🌤️ Mainly clear",2:"⛅ Partly cloudy",3:"☁️ Overcast",
@@ -130,31 +108,7 @@ def sky_class(code):
 def wind_dir_label(deg):
     if deg is None: return "—"
     return WIND_DIRS[round(deg/22.5)%16]
-st.markdown("## 🎨 Theme Pack")
 
-theme = st.selectbox(
-    "theme_pack_selectbox",
-    ["Default", "Cyberpunk", "Sunset", "Ocean", "Midnight"]
-)
-
-themes = {
-    "Default": "linear-gradient(160deg, #0f172a, #1e293b, #334155)",
-    "Cyberpunk": "linear-gradient(160deg, #ff00cc, #3333ff, #00ffee)",
-    "Sunset": "linear-gradient(160deg, #ff9966, #ff5e62, #ffcc70)",
-    "Ocean": "linear-gradient(160deg, #2193b0, #6dd5ed, #38bdf8)",
-    "Midnight": "linear-gradient(160deg, #020617, #0f172a, #000000)",
-}
-
-bg = themes[theme]
-
-st.markdown(f"""
-<style>
-.stApp {{
-    background: {bg} !important;
-    color: white;
-}}
-</style>
-""", unsafe_allow_html=True)
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def to_c(f): return round((f-32)*5/9)
 def to_f(c): return round(c*9/5+32)
@@ -684,29 +638,8 @@ def render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly
         for i in range(24):
             bg = "rgba(255,255,255,0.12)" if i == now_h else "transparent"
             t = hourly_temps_d[i]; f = hourly_feels_d[i]; r = hourly_rain_vals[i]; w = hourly_wind[i]
-            # Written outfit description
-            if t < 35:
-                wear = "Heavy coat, thermals, gloves, scarf"
-            elif t < 50:
-                wear = "Winter jacket, jeans, warm boots"
-            elif t < 60:
-                wear = "Light jacket or fleece, jeans"
-            elif t < 65:
-                wear = "Hoodie or sweater, jeans"
-            elif t < 72:
-                wear = "Light hoodie, casual pants"
-            elif t < 80:
-                wear = "T-shirt, light pants or jeans"
-            elif t < 88:
-                wear = "Shorts, light t-shirt, sunglasses"
-            else:
-                wear = "Shorts, tank top, sunscreen, hat"
-            if r > 60:
-                wear += " + umbrella & waterproof shoes"
-            elif r > 35:
-                wear += " + umbrella"
-            if w > 20:
-                wear += " + windbreaker"
+            wear = "🧥" if t < 50 else "🧶" if t < 65 else "👕" if t < 80 else "🩳"
+            if r > 50: wear += "☔"
             html += f'<tr style="background:{bg};border-bottom:1px solid rgba(255,255,255,0.06);">'
             html += f'<td style="padding:6px 10px;color:{"#FCD34D" if i==now_h else "white"};font-weight:{"700" if i==now_h else "400"};">{"▶ " if i==now_h else ""}{hour_labels[i]}</td>'
             html += f'<td style="padding:6px 10px;text-align:center;color:white;">{round(t)}{unit}</td>'
@@ -2027,27 +1960,34 @@ def thermometer_svg(temp_f, unit, temp_d):
         <text x="42" y="14" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">120°</text>
         <text x="42" y="54" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">60°</text>
         <text x="42" y="94" font-size="7" fill="rgba(255,255,255,0.5)" font-family="Outfit,sans-serif">0°</text>
-    height=60)
-if st.session_state.history:
-    st.markdown(f'<div class="chip-row">'+''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)+'</div>',unsafe_allow_html=True)
+      </svg>
+      <div style="font-size:20px;font-weight:700;color:{col};margin-top:6px;">{round(temp_d)}{unit}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);">{"Freezing" if temp_f<32 else "Cold" if temp_f<50 else "Cool" if temp_f<65 else "Comfortable" if temp_f<77 else "Warm" if temp_f<90 else "Hot"}</div>
+    </div>"""
 
-render_autocomplete_search()
-saved_city = st.query_params.get("city", "")
-city_typed = st.text_input("",placeholder="Or type below and press Enter...",label_visibility="collapsed",value=st.session_state.get("city_input", saved_city),key="main_city_input")
-if city_typed.strip():
-    st.query_params["city"] = city_typed.strip()
-fetch_city=city_typed.strip()
+
+# ── B4: Feels-like vs actual comparison ──────────────────────────────────────
+def render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit):
+    diff = feels_f - temp_f
+    if diff < -3:
+        reason = f"🌬️ Wind chill — {round(wind_mph)} mph winds making it feel {abs(round(diff))}° colder"
+        bar_col = "#60A5FA"
+    elif diff > 3:
+        reason = f"💧 Humidity — {humidity}% moisture trapping heat, feels {round(diff)}° warmer"
+        bar_col = "#FB923C"
+    else:
+        reason = "✅ Feels very close to actual — calm winds and comfortable humidity"
         bar_col = "#4ADE80"
     actual_pct = 60; feels_pct = round(actual_pct + (diff / 30) * 40)
     feels_pct = max(10, min(90, feels_pct))
     st.markdown(f"""<div class="glass-card">
-      <div class="box-title">Actual vs Feels Like</div>
+      <div class="box-title">🌡️ Actual vs Feels Like</div>
       <div style="display:flex;align-items:center;gap:20px;margin:10px 0;flex-wrap:wrap;">
         <div style="flex:1;text-align:center;">
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">ACTUAL</div>
           <div style="font-size:36px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
         </div>
-        <div style="font-size:28px;"></div>
+        <div style="font-size:28px;">→</div>
         <div style="flex:1;text-align:center;">
           <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:4px;">FEELS LIKE</div>
           <div style="font-size:36px;font-weight:900;color:{bar_col};">{round(feels_d)}{unit}</div>
@@ -2078,9 +2018,9 @@ def render_day_progress(local_now, sunrise_str, sunset_str):
         else:
             msg = "🌙 After sunset — night time"
         st.markdown(f"""<div class="glass-card">
-          <div class="box-title"> Day Progress</div>
+          <div class="box-title">🌅 Day Progress</div>
           <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:6px;">
-            <span> {sunrise_str}</span><span>{pct}% of daylight</span><span> {sunset_str}</span>
+            <span>🌅 {sunrise_str}</span><span>{pct}% of daylight</span><span>🌇 {sunset_str}</span>
           </div>
           <div style="background:rgba(255,255,255,0.1);border-radius:20px;height:14px;overflow:hidden;position:relative;">
             <div style="height:14px;width:{pct}%;background:linear-gradient(90deg,#FF6B35,#FFD700,#87CEEB);border-radius:20px;transition:width 1s;"></div>
@@ -2726,11 +2666,10 @@ if st.session_state.history:
     st.markdown(f'<div class="chip-row">'+''.join(f'<span class="chip">🕐 {c}</span>' for c in st.session_state.history)+'</div>',unsafe_allow_html=True)
 
 # N24: Autocomplete search
+render_autocomplete_search()
 # N24: Autocomplete search
-saved_city = st.query_params.get("city", "")
-city_typed = st.text_input("",placeholder="Or type below and press Enter...",label_visibility="collapsed",value=st.session_state.get("city_input", saved_city),key="main_city_input")
-if city_typed.strip():
-    st.query_params["city"] = city_typed.strip()
+render_autocomplete_search()
+city_typed=st.text_input("",placeholder="Or type below and press Enter...",label_visibility="collapsed",value=st.session_state.city_input)
 # N21: Pre-fill from URL if empty
 if not city_typed:
     url_city = get_city_from_url()
@@ -3129,232 +3068,3 @@ _kb.html(KEYBOARD_JS, height=0, scrolling=False)
 # N24: Autocomplete search shown at top (below header)
 render_favourites()
 inject_pwa()
-
-# ═══════════════════════════════════════
-# 🎨 THEME PACK
-# ═══════════════════════════════════════
-
-st.markdown("## 🎨 Theme Pack")
-
-theme = st.selectbox(
-    "Choose Theme",
-    [
-        "Default",
-        "Cyberpunk",
-        "Sunset",
-        "Ocean",
-        "Midnight"
-    ]
-)
-
-# DEFAULT
-bg = """
-linear-gradient(
-160deg,
-#0f172a,
-#1e293b,
-#334155
-)
-"""
-
-# CYBERPUNK
-if theme == "Cyberpunk":
-
-    bg = """
-    linear-gradient(
-    160deg,
-    #ff00cc,
-    #3333ff,
-    #00ffee
-    )
-    """
-
-# SUNSET
-elif theme == "Sunset":
-
-    bg = """
-    linear-gradient(
-    160deg,
-    #ff9966,
-    #ff5e62,
-    #ffcc70
-    )
-    """
-
-# OCEAN
-elif theme == "Ocean":
-
-    bg = """
-    linear-gradient(
-    160deg,
-    #2193b0,
-    #6dd5ed,
-    #38bdf8
-    )
-    """
-
-# MIDNIGHT
-elif theme == "Midnight":
-
-    bg = """
-    linear-gradient(
-    160deg,
-    #020617,
-    #0f172a,
-    #000000
-    )
-    """
-
-# APPLY THEME
-st.markdown(f"""
-<style>
-
-.stApp {{
-    background: {bg};
-    color: white;
-}}
-
-</style>
-""", unsafe_allow_html=True) 
-
-
-
-    # ═══════════════════════════════════════
-# 🎮 WEATHER GAME GATE
-# ═══════════════════════════════════════
-
-st.markdown("---")
-st.markdown("## 🎮 Play Weather Game?")
-
-play_game = st.radio(
-    "Choose One",
-    ["Yes", "No"]
-)
-
-# ═══════════════════════════════════════
-# IF NO → SKIP GAME
-# ═══════════════════════════════════════
-
-if play_game == "No":
-
-    st.success("🌤️ Weather Unlocked!")
-
-    city = st.text_input(
-        "📍 Type Your Location"
-    )
-
-    if city:
-
-        # PUT YOUR WEATHER CODE HERE
-        st.write(f"Showing weather for {city}")
-
-# ═══════════════════════════════════════
-# IF YES → PLAY GAME FIRST
-# ═══════════════════════════════════════
-
-else:
-
-    weather_options = [
-        ("☀️", "Sunny"),
-        ("🌧️", "Rainy"),
-        ("❄️", "Snowy"),
-        ("⛈️", "Stormy"),
-    ]
-
-    if "game_weather" not in st.session_state:
-        st.session_state.game_weather = random.choice(weather_options)
-
-    emoji, answer = st.session_state.game_weather
-
-    st.markdown(
-        f"""
-        <div style="
-            text-align:center;
-            padding:30px;
-            border-radius:20px;
-            background:rgba(255,255,255,0.08);
-        ">
-            <div style="font-size:90px;">{emoji}</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    guess = st.radio(
-        "Guess The Weather",
-        ["Sunny", "Rainy", "Snowy", "Stormy"]
-    )
-
-    if st.button("🎯 Submit"):
-
-        if guess == answer:
-
-            st.success("🎉 Correct! Weather Unlocked!")
-
-            city = st.text_input(
-                "📍 Type Your Location"
-            )
-
-            if city:
-
-                # PUT YOUR WEATHER CODE HERE
-                st.write(f"Showing weather for {city}")
-
-        else:
-
-            st.error(f"❌ Wrong! It was {answer}")
-
-    if st.button("🔄 New Round"):
-
-        st.session_state.game_weather = random.choice(weather_options)
-        st.rerun()
-    # ═══════════════════════════════════════
-# 🎨 SIMPLE LOGO MAKER
-# ═══════════════════════════════════════
-
-st.markdown("---")
-st.markdown("## 🎨 Quick Logo Creator")
-
-logo_text = st.text_input(
-    "Business/App Name",
-    placeholder="NimbusAI",
-    key="logo_text_input"
-)
-
-logo_color = st.color_picker(
-    "Pick Logo Color",
-    "#38b6ff",
-    key="logo_color_picker"
-)
-
-logo_emoji = st.selectbox(
-    "Choose Logo Emoji",
-    ["⚡", "🚀", "🌟", "🔥", "💎", "🎯", "🌊", "🍀", "🦋", "🐉",
-     "🌈", "🏆", "💡", "🎨", "🔮", "🦅", "🌙", "☀️", "❄️", "🎵",
-     "None"],
-    key="logo_emoji_selectbox"
-)
-
-if logo_text:
-    # Build prefix — skip if "None" selected
-    prefix = "" if logo_emoji == "None" else f"{logo_emoji} "
-
-    st.markdown(f"""
-    <div style="
-        background:rgba(255,255,255,0.1);
-        padding:40px;
-        border-radius:20px;
-        text-align:center;
-        margin-top:15px;
-        border:1px solid rgba(255,255,255,0.2);
-    ">
-        <div style="
-            font-size:48px;
-            font-weight:900;
-            color:{logo_color};
-            letter-spacing:2px;
-        ">
-            {prefix}{logo_text}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
