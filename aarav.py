@@ -363,6 +363,10 @@ def fetch_weather(city_name, unit):
             timeout=8
         ).json()
 
+        # Bail out if the forecast API returned an error payload instead of real data
+        if "current" not in wx_f or "daily" not in wx_f or "hourly" not in wx_f:
+            return None, None, None, None
+
         wx_display = wx_f
         if unit == "°C":
             wx_display = requests.get(
@@ -373,15 +377,20 @@ def fetch_weather(city_name, unit):
                 f"&temperature_unit=celsius&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1",
                 timeout=8
             ).json()
+            # Same guard for the °C request
+            if "current" not in wx_display or "daily" not in wx_display or "hourly" not in wx_display:
+                return None, None, None, None
 
         aq = requests.get(
             f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}"
             f"&current=us_aqi,pm2_5,grass_pollen,tree_pollen",
             timeout=8
         ).json()
+        if "current" not in aq:
+            aq = {"current": {}}  # Don't fail the whole app just because AQ is down
 
         return wx_f, wx_display, aq, {"lat": lat, "lon": lon, "name": name, "country": country}
-    except Exception as e:
+    except Exception:
         return None, None, None, None
 
 def get_cached_or_fetch(city, unit):
@@ -393,7 +402,7 @@ def get_cached_or_fetch(city, unit):
         if age < 1800:
             return st.session_state[cache_key], True
     result = fetch_weather(city, unit)
-    if result[0]:
+    if result[0] is not None and "current" in result[0]:
         st.session_state[cache_key] = result
         st.session_state[time_key]  = now
     return result, False
