@@ -9,6 +9,7 @@ st.set_page_config(
 import requests
 import math
 import random
+import time
 import json
 import urllib.parse
 from datetime import datetime, timedelta
@@ -339,18 +340,62 @@ def forecast_confidence(day_offset):
 # DATA FETCHING
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _get_json(url, timeout=8, retries=2):
+    """GET a URL and parse JSON, retrying briefly on transient/rate-limit failures."""
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            if resp.status_code == 429:
+                last_err = f"rate_limited (HTTP 429) on attempt {attempt+1}"
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            if resp.status_code >= 400:
+                last_err = f"HTTP {resp.status_code} on attempt {attempt+1}"
+                time.sleep(0.4 * (attempt + 1))
+                continue
+            data = resp.json()
+            if isinstance(data, dict) and data.get("error"):
+                last_err = f"API error: {data.get('reason', 'unknown')}"
+                time.sleep(0.4 * (attempt + 1))
+                continue
+            return data, None
+        except Exception as e:
+            last_err = str(e)
+            time.sleep(0.4 * (attempt + 1))
+    return None, last_err
+
+def _to_celsius_view(wx_f):
+    """Derive a Celsius-unit copy of a Fahrenheit forecast payload without a second API call."""
+    import copy
+    wx_c = copy.deepcopy(wx_f)
+    for key in ("temperature_2m", "apparent_temperature"):
+        if key in wx_c.get("current", {}):
+            wx_c["current"][key] = to_c(wx_c["current"][key])
+        if key in wx_c.get("hourly", {}):
+            wx_c["hourly"][key] = [to_c(v) if v is not None else v for v in wx_c["hourly"][key]]
+    for key in ("temperature_2m_max", "temperature_2m_min"):
+        if key in wx_c.get("daily", {}):
+            wx_c["daily"][key] = [to_c(v) if v is not None else v for v in wx_c["daily"][key]]
+    return wx_c
+
 def fetch_weather(city_name, unit):
+    st.session_state["last_fetch_error"] = None
     try:
-        geo = requests.get(
-            f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1",
-            timeout=8
-        ).json()
-        if "results" not in geo or not geo["results"]: return None, None, None, None
+        geo, err = _get_json(
+            f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city_name)}&count=1"
+        )
+        if geo is None:
+            st.session_state["last_fetch_error"] = f"Geocoding failed: {err}"
+            return None, None, None, None
+        if "results" not in geo or not geo["results"]:
+            st.session_state["last_fetch_error"] = "City not found in geocoding results"
+            return None, None, None, None
         r = geo["results"][0]
         lat, lon = r["latitude"], r["longitude"]
         name = r["name"]; country = r.get("country", "")
 
-        wx_f = requests.get(
+        wx_f, err = _get_json(
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
             f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
             f"wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,"
@@ -359,38 +404,26 @@ def fetch_weather(city_name, unit):
             f"wind_speed_10m,uv_index"
             f"&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,"
             f"precipitation_probability_max,precipitation_sum"
-            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1",
-            timeout=8
-        ).json()
-
-        # Bail out if the forecast API returned an error payload instead of real data
-        if "current" not in wx_f or "daily" not in wx_f or "hourly" not in wx_f:
+            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1"
+        )
+        if wx_f is None or "current" not in wx_f or "daily" not in wx_f or "hourly" not in wx_f:
+            st.session_state["last_fetch_error"] = f"Forecast fetch failed: {err or 'missing fields in response'}"
             return None, None, None, None
 
-        wx_display = wx_f
-        if unit == "°C":
-            wx_display = requests.get(
-                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-                f"&current=temperature_2m,apparent_temperature"
-                f"&hourly=temperature_2m,apparent_temperature"
-                f"&daily=temperature_2m_max,temperature_2m_min"
-                f"&temperature_unit=celsius&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1",
-                timeout=8
-            ).json()
-            # Same guard for the °C request
-            if "current" not in wx_display or "daily" not in wx_display or "hourly" not in wx_display:
-                return None, None, None, None
+        # Derive the °C view locally instead of firing a second API call (avoids extra rate-limit pressure)
+        wx_display = _to_celsius_view(wx_f) if unit == "°C" else wx_f
 
-        aq = requests.get(
+        aq, aq_err = _get_json(
             f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}"
             f"&current=us_aqi,pm2_5,grass_pollen,tree_pollen",
-            timeout=8
-        ).json()
-        if "current" not in aq:
+            retries=1
+        )
+        if aq is None or "current" not in aq:
             aq = {"current": {}}  # Don't fail the whole app just because AQ is down
 
         return wx_f, wx_display, aq, {"lat": lat, "lon": lon, "name": name, "country": country}
-    except Exception:
+    except Exception as e:
+        st.session_state["last_fetch_error"] = f"Unexpected error: {e}"
         return None, None, None, None
 
 def get_cached_or_fetch(city, unit):
@@ -2038,7 +2071,13 @@ if fetch_city:
         if from_cache:
             st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.4);text-align:right;">⚡ Loaded from cache</div>', unsafe_allow_html=True)
         if result[0] is None:
-            st.error("❌ City not found! Try a different spelling.")
+            reason = st.session_state.get("last_fetch_error", "")
+            if reason and "geocoding results" not in reason.lower():
+                st.error(f"⚠️ Couldn't load weather data right now ({reason}). This is usually temporary — try again in a few seconds.")
+                if st.button("🔄 Retry"):
+                    st.rerun()
+            else:
+                st.error("❌ City not found! Try a different spelling.")
             st.stop()
 
         wx_f, wx_display, aq, meta = result
