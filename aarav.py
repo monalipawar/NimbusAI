@@ -986,8 +986,8 @@ def render_historical(lat, lon, unit):
                f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code"
                f"&temperature_unit={'fahrenheit' if unit=='°F' else 'celsius'}"
                f"&timezone=auto&start_date={date_str}&end_date={date_str}")
-        data = requests.get(url, timeout=8).json()
-        if "daily" in data:
+        data, _err = _get_json(url, retries=2)
+        if data and "daily" in data:
             hi = round(data["daily"]["temperature_2m_max"][0])
             lo = round(data["daily"]["temperature_2m_min"][0])
             rain = round(data["daily"].get("precipitation_sum",[0])[0], 1)
@@ -1038,20 +1038,20 @@ def render_trip_planner():
                 st.error("Return date must be after departure date.")
             else:
                 with st.spinner("Fetching trip forecast..."):
-                    geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={dest.strip()}&count=1", timeout=6).json()
-                    if "results" not in geo or not geo["results"]:
-                        st.error("Destination not found.")
+                    geo, geo_err = _get_json(f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(dest.strip())}&count=1", timeout=6, retries=2)
+                    if not geo or "results" not in geo or not geo["results"]:
+                        st.error(f"Destination not found.{' (' + geo_err + ')' if geo_err else ''}")
                     else:
                         r2 = geo["results"][0]; lat2, lon2 = r2["latitude"], r2["longitude"]
                         days = min((end - start).days + 1, 16)
-                        wx = requests.get(
+                        wx, wx_err = _get_json(
                             f"https://api.open-meteo.com/v1/forecast?latitude={lat2}&longitude={lon2}"
                             f"&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max"
                             f"&temperature_unit=fahrenheit&timezone=auto&forecast_days={days}&start_date={start}",
-                            timeout=8
-                        ).json()
-                        if "daily" not in wx:
-                            st.error("Could not fetch forecast.")
+                            timeout=8, retries=2
+                        )
+                        if not wx or "daily" not in wx:
+                            st.error(f"Could not fetch forecast.{' (' + wx_err + ')' if wx_err else ''}")
                         else:
                             st.markdown(f'<div class="ai-box"><div class="box-title">✈️ {r2["name"]} Trip Forecast</div>Your {days}-day trip weather summary</div>', unsafe_allow_html=True)
                             fc = '<div class="forecast-row" style="flex-wrap:wrap;">'
@@ -1458,9 +1458,9 @@ def render_30day_history(lat, lon, unit):
                        f"&daily=temperature_2m_max,temperature_2m_min"
                        f"&temperature_unit={'fahrenheit' if unit=='°F' else 'celsius'}"
                        f"&timezone=auto")
-                data = requests.get(url, timeout=10).json()
-                if "daily" not in data:
-                    st.warning("Historical data unavailable."); return
+                data, data_err = _get_json(url, timeout=10, retries=2)
+                if not data or "daily" not in data:
+                    st.warning(f"Historical data unavailable.{' (' + data_err + ')' if data_err else ''}"); return
                 dates = data["daily"]["time"]
                 highs = data["daily"]["temperature_2m_max"]
                 lows  = data["daily"]["temperature_2m_min"]
@@ -2486,4 +2486,3 @@ if logo_text:
 render_favourites()
 inject_pwa()
 components.html(KEYBOARD_JS, height=0, scrolling=False)
-        
