@@ -341,8 +341,27 @@ def forecast_confidence(day_offset):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _get_json(url, timeout=8, retries=4):
-    """GET a URL and parse JSON, retrying with exponential backoff on transient/rate-limit failures."""
+    """GET a URL and parse JSON, retrying with exponential backoff on transient/rate-limit failures.
+    If an Open-Meteo API key is configured in st.secrets["OPEN_METEO_API_KEY"], it's automatically
+    appended to open-meteo.com requests and routed to the higher-quota customer subdomain."""
+    try:
+        api_key = st.secrets.get("OPEN_METEO_API_KEY", "")
+    except Exception:
+        api_key = ""
+    if api_key and "open-meteo.com" in url and "customer-" not in url:
+        url = url.replace("://api.open-meteo.com", "://customer-api.open-meteo.com") \
+                 .replace("://geocoding-api.open-meteo.com", "://customer-geocoding-api.open-meteo.com") \
+                 .replace("://air-quality-api.open-meteo.com", "://customer-air-quality-api.open-meteo.com") \
+                 .replace("://archive-api.open-meteo.com", "://customer-archive-api.open-meteo.com")
+        url += f"&apikey={api_key}"
+
     last_err = None
+    if "open-meteo.com" in url:
+        last_call = st.session_state.get("_last_om_call", 0)
+        gap = time.time() - last_call
+        if gap < 0.3:
+            time.sleep(0.3 - gap)
+        st.session_state["_last_om_call"] = time.time()
     for attempt in range(retries + 1):
         try:
             resp = requests.get(url, timeout=timeout)
@@ -379,12 +398,26 @@ def _to_celsius_view(wx_f):
             wx_c["daily"][key] = [to_c(v) if v is not None else v for v in wx_c["daily"][key]]
     return wx_c
 
+def _geocode_cached(city_name):
+    """Geocode with a long-lived cache — coordinates for a city almost never change."""
+    key = f"geocache_{city_name.strip().lower()}"
+    tkey = f"geocache_time_{city_name.strip().lower()}"
+    now = datetime.now()
+    if key in st.session_state and tkey in st.session_state:
+        if (now - st.session_state[tkey]).total_seconds() < 86400:  # 24h
+            return st.session_state[key], None
+    geo, err = _get_json(
+        f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city_name)}&count=1"
+    )
+    if geo is not None and "results" in geo and geo["results"]:
+        st.session_state[key] = geo
+        st.session_state[tkey] = now
+    return geo, err
+
 def fetch_weather(city_name, unit):
     st.session_state["last_fetch_error"] = None
     try:
-        geo, err = _get_json(
-            f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city_name)}&count=1"
-        )
+        geo, err = _geocode_cached(city_name)
         if geo is None:
             st.session_state["last_fetch_error"] = f"Geocoding failed: {err}"
             return None, None, None, None
