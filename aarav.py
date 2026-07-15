@@ -340,29 +340,29 @@ def forecast_confidence(day_offset):
 # DATA FETCHING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _get_json(url, timeout=8, retries=2):
-    """GET a URL and parse JSON, retrying briefly on transient/rate-limit failures."""
+def _get_json(url, timeout=8, retries=4):
+    """GET a URL and parse JSON, retrying with exponential backoff on transient/rate-limit failures."""
     last_err = None
     for attempt in range(retries + 1):
         try:
             resp = requests.get(url, timeout=timeout)
             if resp.status_code == 429:
                 last_err = f"rate_limited (HTTP 429) on attempt {attempt+1}"
-                time.sleep(0.6 * (attempt + 1))
+                time.sleep(min(8, (2 ** attempt) * 0.5) + random.uniform(0, 0.3))
                 continue
             if resp.status_code >= 400:
                 last_err = f"HTTP {resp.status_code} on attempt {attempt+1}"
-                time.sleep(0.4 * (attempt + 1))
+                time.sleep(min(4, (2 ** attempt) * 0.3))
                 continue
             data = resp.json()
             if isinstance(data, dict) and data.get("error"):
                 last_err = f"API error: {data.get('reason', 'unknown')}"
-                time.sleep(0.4 * (attempt + 1))
+                time.sleep(min(4, (2 ** attempt) * 0.3))
                 continue
             return data, None
         except Exception as e:
             last_err = str(e)
-            time.sleep(0.4 * (attempt + 1))
+            time.sleep(min(4, (2 ** attempt) * 0.3))
     return None, last_err
 
 def _to_celsius_view(wx_f):
@@ -427,13 +427,15 @@ def fetch_weather(city_name, unit):
         return None, None, None, None
 
 def get_cached_or_fetch(city, unit):
-    cache_key = f"cache_{city.lower()}_{unit}"
-    time_key  = f"cache_time_{city.lower()}_{unit}"
+    cache_key = f"cache_{city.lower()}"
+    time_key  = f"cache_time_{city.lower()}"
     now = datetime.now()
     if cache_key in st.session_state and time_key in st.session_state:
         age = (now - st.session_state[time_key]).total_seconds()
         if age < 1800:
-            return st.session_state[cache_key], True
+            wx_f, _, aq, meta = st.session_state[cache_key]
+            wx_display = _to_celsius_view(wx_f) if unit == "°C" else wx_f
+            return (wx_f, wx_display, aq, meta), True
     result = fetch_weather(city, unit)
     if result[0] is not None and "current" in result[0]:
         st.session_state[cache_key] = result
@@ -2484,3 +2486,4 @@ if logo_text:
 render_favourites()
 inject_pwa()
 components.html(KEYBOARD_JS, height=0, scrolling=False)
+        
