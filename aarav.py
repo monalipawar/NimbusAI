@@ -507,6 +507,62 @@ def get_cached_or_fetch(city, unit):
     return result, False
 
 
+def generate_ai_summary(city_name, temp_f, feels_f, cond, humidity, wind_mph,
+                         rain_pct, uv, aqi_text, unit, temp_d, feels_d):
+    """AI-generated weather summary via Google Gemini's free tier, cached for
+    the same 30 minutes as the underlying weather data. Falls back to the
+    rule-based ai_comment() if no GEMINI_API_KEY is configured, or if the
+    call fails for any reason — this should never be able to break the page."""
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        api_key = ""
+    if not api_key:
+        return ai_comment(temp_f, cond, wind_mph)
+
+    cache_key = f"ai_summary_{city_name.lower()}_{unit}"
+    time_key = f"ai_summary_time_{city_name.lower()}_{unit}"
+    now = datetime.now()
+    if cache_key in st.session_state and time_key in st.session_state:
+        if (now - st.session_state[time_key]).total_seconds() < 1800:
+            return st.session_state[cache_key]
+
+    prompt = (
+        f"Write one short, natural sentence (max ~30 words, no preamble, no quotes) "
+        f"summarizing today's weather for a weather app. Sound like a knowledgeable "
+        f"friend, not a forecast robot. Data: {city_name}, {round(temp_d)}{unit} "
+        f"(feels {round(feels_d)}{unit}), {cond}, {humidity}% humidity, "
+        f"{round(wind_mph)} mph wind, {rain_pct}% rain chance, UV {round(uv)}, "
+        f"air quality {aqi_text}."
+    )
+    try:
+        resp = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={api_key}",
+            headers={"content-type": "application/json"},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 100},
+            },
+            timeout=6,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            summary = ""
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                summary = " ".join(p.get("text", "") for p in parts).strip()
+            if summary:
+                st.session_state[cache_key] = summary
+                st.session_state[time_key] = now
+                return summary
+    except Exception:
+        pass
+
+    return ai_comment(temp_f, cond, wind_mph)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SVG / CHART BUILDERS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2272,7 +2328,7 @@ if fetch_city:
         # Quick summary cards
         st.markdown(f'<div class="info-box"><div class="box-title">📅 What Changed Since Yesterday</div>{yesterday_change}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="ai-box"><div class="box-title">🌟 Best Time to Go Outside</div>{best_window_str}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{ai_comment(temp_f, condition_str, wind_mph)}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{generate_ai_summary(city_name, temp_f, feels_f, condition_str, humidity, wind_mph, rain_pct, uv, aqi_text, unit, temp_d, feels_d)}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="glass-card"><div class="box-title">🌡️ Why Does It Feel Like That?</div><div style="font-size:14px;color:white;">{feels_like_reason(temp_f, humidity, wind_mph)}</div></div>', unsafe_allow_html=True)
 
         # Tomorrow preview
