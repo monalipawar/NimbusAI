@@ -563,6 +563,104 @@ def generate_ai_summary(city_name, temp_f, feels_f, cond, humidity, wind_mph,
     return ai_comment(temp_f, cond, wind_mph)
 
 
+def build_weather_context(city_name, country, temp_f, feels_f, cond, humidity, wind_mph,
+                           wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
+                           temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str):
+    """Compact plain-text snapshot of everything the chatbot is allowed to know about."""
+    return (
+        f"Location: {city_name}, {country}\n"
+        f"Right now: {round(temp_d)}{unit} (feels like {round(feels_d)}{unit}), {cond}\n"
+        f"Today's high/low: {hi_d}{unit} / {lo_d}{unit}\n"
+        f"Tomorrow: {t_cond_str}, high {t_hi_d}{unit} / low {t_lo_d}{unit}\n"
+        f"Humidity: {humidity}% · Wind: {round(wind_mph)} mph {wind_dir_str} · "
+        f"Rain chance: {rain_pct}% · UV index: {round(uv)} · Air quality: {aqi_text}\n"
+        f"Sunrise: {sr_fmt} · Sunset: {ss_fmt}"
+    )
+
+
+def ask_weather_chatbot(user_question, weather_context, chat_history):
+    """One turn of the weather chatbot via Gemini's free tier. Returns the
+    assistant's reply text, or an error string starting with '⚠️' that the
+    caller should show inline rather than crash on."""
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        api_key = ""
+    if not api_key:
+        return ("⚠️ No GEMINI_API_KEY configured, so the chatbot can't run. "
+                "Add one in your app secrets (it's free — see aistudio.google.com/apikey).")
+
+    system_preamble = (
+        "You are a friendly, concise weather assistant embedded in a weather app called "
+        "NimbusAI. Answer the user's question using ONLY the weather data provided below — "
+        "don't invent numbers that aren't there. If asked something the data can't answer "
+        "(like weather for a different city, or something unrelated to weather), say so "
+        "briefly and redirect to what you can help with. Keep answers short — a few "
+        "sentences at most, conversational, no headers or bullet lists unless truly needed.\n\n"
+        f"Current weather data:\n{weather_context}"
+    )
+
+    contents = [{"role": "user", "parts": [{"text": system_preamble}]},
+                {"role": "model", "parts": [{"text": "Got it — ready to help with the weather shown above."}]}]
+    for msg in chat_history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+    contents.append({"role": "user", "parts": [{"text": user_question}]})
+
+    try:
+        resp = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={api_key}",
+            headers={"content-type": "application/json"},
+            json={"contents": contents, "generationConfig": {"maxOutputTokens": 300}},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                reply = " ".join(p.get("text", "") for p in parts).strip()
+                if reply:
+                    return reply
+            return "⚠️ Got an empty response — try rephrasing your question."
+        elif resp.status_code == 429:
+            return "⚠️ Hit Gemini's free-tier rate limit — wait a minute and try again."
+        else:
+            return f"⚠️ Chatbot request failed (HTTP {resp.status_code})."
+    except Exception as e:
+        return f"⚠️ Couldn't reach the chatbot: {str(e)[:80]}"
+
+
+def render_weather_chatbot(weather_context):
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">💬 Ask NimbusAI</p>', unsafe_allow_html=True)
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    for msg in st.session_state.chat_history[-12:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    question = st.chat_input("Ask about today's weather — e.g. 'should I bring an umbrella?'")
+    if question:
+        st.session_state.chat_history.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.markdown(question)
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                reply = ask_weather_chatbot(question, weather_context, st.session_state.chat_history[:-1])
+            st.markdown(reply)
+        st.session_state.chat_history.append({"role": "assistant", "content": reply})
+        st.session_state.chat_history = st.session_state.chat_history[-20:]
+
+    if st.session_state.chat_history:
+        if st.button("🗑️ Clear chat"):
+            st.session_state.chat_history = []
+            st.rerun()
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SVG / CHART BUILDERS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2569,6 +2667,13 @@ if fetch_city:
 
         render_day_progress(local_now, sr_fmt, ss_fmt)
         render_wind_detail(wind_mph, gusts_mph, wind_dir_str)
+
+        weather_context = build_weather_context(
+            city_name, country, temp_f, feels_f, condition_str, humidity, wind_mph,
+            wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
+            temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
+        )
+        render_weather_chatbot(weather_context)
 
         # Auto-refresh countdown
         if "last_fetch_time" not in st.session_state:
