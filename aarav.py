@@ -536,9 +536,10 @@ def generate_ai_summary(city_name, temp_f, feels_f, cond, humidity, wind_mph,
         f"air quality {aqi_text}."
     )
     try:
+        _gemini_throttle_wait()
         resp = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={api_key}",
+            f"gemini-2.5-flash-lite:generateContent?key={api_key}",
             headers={"content-type": "application/json"},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
@@ -578,6 +579,17 @@ def build_weather_context(city_name, country, temp_f, feels_f, cond, humidity, w
     )
 
 
+def _gemini_throttle_wait(min_gap_seconds=4):
+    """Simple self-imposed spacing between Gemini calls (shared by the
+    summary generator and the chatbot) so a burst of activity can't burn
+    through the free tier's small per-minute quota in a few seconds."""
+    last_call = st.session_state.get("_last_gemini_call", 0)
+    gap = time.time() - last_call
+    if gap < min_gap_seconds:
+        time.sleep(min_gap_seconds - gap)
+    st.session_state["_last_gemini_call"] = time.time()
+
+
 def ask_weather_chatbot(user_question, weather_context, chat_history):
     """One turn of the weather chatbot via Gemini's free tier. Returns the
     assistant's reply text, or an error string starting with '⚠️' that the
@@ -607,10 +619,11 @@ def ask_weather_chatbot(user_question, weather_context, chat_history):
         contents.append({"role": role, "parts": [{"text": msg["content"]}]})
     contents.append({"role": "user", "parts": [{"text": user_question}]})
 
+    _gemini_throttle_wait()
     try:
         resp = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={api_key}",
+            f"gemini-2.5-flash-lite:generateContent?key={api_key}",
             headers={"content-type": "application/json"},
             json={"contents": contents, "generationConfig": {"maxOutputTokens": 300}},
             timeout=10,
@@ -625,9 +638,21 @@ def ask_weather_chatbot(user_question, weather_context, chat_history):
                     return reply
             return "⚠️ Got an empty response — try rephrasing your question."
         elif resp.status_code == 429:
-            return "⚠️ Hit Gemini's free-tier rate limit — wait a minute and try again."
+            retry_after = ""
+            try:
+                for detail in resp.json().get("error", {}).get("details", []):
+                    if detail.get("@type", "").endswith("RetryInfo") and detail.get("retryDelay"):
+                        retry_after = f" (Google suggests waiting {detail['retryDelay']})"
+                        break
+            except Exception:
+                pass
+            return f"⚠️ Hit Gemini's free-tier rate limit{retry_after} — try again shortly."
         else:
-            return f"⚠️ Chatbot request failed (HTTP {resp.status_code})."
+            try:
+                api_reason = resp.json().get("error", {}).get("message", "")
+            except Exception:
+                api_reason = ""
+            return f"⚠️ Chatbot request failed (HTTP {resp.status_code})" + (f": {api_reason}" if api_reason else "")
     except Exception as e:
         return f"⚠️ Couldn't reach the chatbot: {str(e)[:80]}"
 
@@ -2444,6 +2469,13 @@ if fetch_city:
           </div>
         </div>""", unsafe_allow_html=True)
 
+        weather_context = build_weather_context(
+            city_name, country, temp_f, feels_f, condition_str, humidity, wind_mph,
+            wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
+            temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
+        )
+        render_weather_chatbot(weather_context)
+
         # Share button
         share_text = (f"📍 {city_name}, {country} — {condition_str}\\n"
                       f"🌡️ {round(temp_d)}{unit} (feels {round(feels_d)}{unit})\\n"
@@ -2667,13 +2699,6 @@ if fetch_city:
 
         render_day_progress(local_now, sr_fmt, ss_fmt)
         render_wind_detail(wind_mph, gusts_mph, wind_dir_str)
-
-        weather_context = build_weather_context(
-            city_name, country, temp_f, feels_f, condition_str, humidity, wind_mph,
-            wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
-            temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
-        )
-        render_weather_chatbot(weather_context)
 
         # Auto-refresh countdown
         if "last_fetch_time" not in st.session_state:
