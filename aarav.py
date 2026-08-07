@@ -539,7 +539,7 @@ def generate_ai_summary(city_name, temp_f, feels_f, cond, humidity, wind_mph,
         _gemini_throttle_wait()
         resp = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.5-flash-lite:generateContent?key={api_key}",
+            f"gemini-3.1-flash-lite:generateContent?key={api_key}",
             headers={"content-type": "application/json"},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
@@ -623,7 +623,7 @@ def ask_weather_chatbot(user_question, weather_context, chat_history):
     try:
         resp = requests.post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.5-flash-lite:generateContent?key={api_key}",
+            f"gemini-3.1-flash-lite:generateContent?key={api_key}",
             headers={"content-type": "application/json"},
             json={"contents": contents, "generationConfig": {"maxOutputTokens": 300}},
             timeout=10,
