@@ -884,7 +884,7 @@ def render_favourites():
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.button("Load", key=f"load_fav_{i}"):
-                        st.session_state.city_input = city
+                        st.session_state["pending_city"] = city
                         st.rerun()
                 with c2:
                     if st.button("❌", key=f"del_fav_{i}"):
@@ -2080,6 +2080,12 @@ if st.session_state.history:
     )
 
 # City input
+# If a favourite (or keyboard shortcut) was just clicked, apply it now —
+# before the widget below is instantiated — since Streamlit won't let us
+# overwrite a widget's own session_state key after it's already rendered.
+if "pending_city" in st.session_state:
+    st.session_state["main_city_input"] = st.session_state.pop("pending_city")
+
 saved_city = st.query_params.get("city", "")
 city_typed = st.text_input(
     "",
@@ -2214,7 +2220,10 @@ if fetch_city:
 
         rc1, rc2 = st.columns([1, 5])
         with rc1:
-            if st.button("🔄 Refresh"): st.rerun()
+            if st.button("🔄 Refresh"):
+                st.session_state.pop(f"cache_{fetch_city.lower()}", None)
+                st.session_state.pop(f"cache_time_{fetch_city.lower()}", None)
+                st.rerun()
 
         # Severe weather alert
         if code in SEVERE_CODES:
