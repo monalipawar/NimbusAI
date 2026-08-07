@@ -345,7 +345,7 @@ def _get_json(url, timeout=8, retries=4):
     If an Open-Meteo API key is configured in st.secrets["OPEN_METEO_API_KEY"], it's automatically
     appended to open-meteo.com requests and routed to the higher-quota customer subdomain."""
     try:
-        api_key = st.secrets.get("OPEN_METEO_API_KEY", "")
+        api_key = st.secrets.get("OPEN_METEO_API_KEY", "") if not st.session_state.get("_om_key_invalid") else ""
     except Exception:
         api_key = ""
     if api_key and "open-meteo.com" in url and "customer-" not in url:
@@ -377,6 +377,21 @@ def _get_json(url, timeout=8, retries=4):
                     reason = resp.json().get("reason", "")
                 except Exception:
                     reason = ""
+                # If a configured "customer" API key is the reason for the
+                # rejection (e.g. it's actually a key for a different
+                # service), silently fall back to the free public endpoint
+                # instead of failing every request for the rest of the
+                # session — the free tier is fully functional on its own.
+                if "customer-" in url and "apikey=" in url:
+                    public_url = (
+                        url.replace("://customer-api.open-meteo.com", "://api.open-meteo.com")
+                           .replace("://customer-geocoding-api.open-meteo.com", "://geocoding-api.open-meteo.com")
+                           .replace("://customer-air-quality-api.open-meteo.com", "://air-quality-api.open-meteo.com")
+                           .replace("://customer-archive-api.open-meteo.com", "://archive-api.open-meteo.com")
+                    )
+                    public_url = public_url.split("&apikey=")[0]
+                    st.session_state["_om_key_invalid"] = True
+                    return _get_json(public_url, timeout=timeout, retries=retries)
                 last_err = f"HTTP {resp.status_code}" + (f": {reason}" if reason else "")
                 return None, last_err
             if resp.status_code >= 500:
@@ -2115,6 +2130,15 @@ if city_typed.strip():
     except: pass
 
 fetch_city = city_typed.strip()
+
+if st.session_state.get("_om_key_invalid") and not st.session_state.get("_om_key_warned"):
+    st.session_state["_om_key_warned"] = True
+    st.warning(
+        "The OPEN_METEO_API_KEY in your app secrets isn't valid for Open-Meteo "
+        "(it may be a key for a different service) — falling back to Open-Meteo's "
+        "free public tier, which works fine without any key. You can safely remove "
+        "that secret."
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
