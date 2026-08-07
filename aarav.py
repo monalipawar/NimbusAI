@@ -369,7 +369,17 @@ def _get_json(url, timeout=8, retries=4):
                 last_err = f"rate_limited (HTTP 429) on attempt {attempt+1}"
                 time.sleep(min(8, (2 ** attempt) * 0.5) + random.uniform(0, 0.3))
                 continue
-            if resp.status_code >= 400:
+            if 400 <= resp.status_code < 500:
+                # Client errors (bad params, invalid timezone, etc.) are
+                # deterministic — retrying the identical request won't
+                # help, so fail fast instead of burning through retries.
+                try:
+                    reason = resp.json().get("reason", "")
+                except Exception:
+                    reason = ""
+                last_err = f"HTTP {resp.status_code}" + (f": {reason}" if reason else "")
+                return None, last_err
+            if resp.status_code >= 500:
                 last_err = f"HTTP {resp.status_code} on attempt {attempt+1}"
                 time.sleep(min(4, (2 ** attempt) * 0.3))
                 continue
@@ -428,7 +438,7 @@ def fetch_weather(city_name, unit):
         lat, lon = r["latitude"], r["longitude"]
         name = r["name"]; country = r.get("country", "")
 
-        wx_f, err = _get_json(
+        forecast_base = (
             f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
             f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
             f"wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,"
@@ -437,8 +447,14 @@ def fetch_weather(city_name, unit):
             f"wind_speed_10m,uv_index"
             f"&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,"
             f"precipitation_probability_max,precipitation_sum"
-            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=7&past_days=1"
+            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&forecast_days=7&past_days=1"
         )
+        wx_f, err = _get_json(forecast_base + "&timezone=auto")
+        if wx_f is None and err and "timezone" in err.lower():
+            # Open-Meteo has a known bug where timezone=auto 400s for certain
+            # coordinates. Fall back to UTC rather than failing outright —
+            # times shown will be UTC instead of local for this city only.
+            wx_f, err = _get_json(forecast_base + "&timezone=UTC")
         if wx_f is None or "current" not in wx_f or "daily" not in wx_f or "hourly" not in wx_f:
             st.session_state["last_fetch_error"] = f"Forecast fetch failed: {err or 'missing fields in response'}"
             return None, None, None, None
