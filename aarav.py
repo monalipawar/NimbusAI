@@ -2258,8 +2258,18 @@ function setCity(name){
   var inputs=window.parent.document.querySelectorAll('input[type="text"]');
   for(var inp of inputs){
     var label=inp.closest('[data-testid="stTextInput"]');
-    if(label){var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
-      nv.set.call(inp,name);inp.dispatchEvent(new Event('input',{bubbles:true}));break;}
+    if(label){
+      var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
+      nv.set.call(inp,name);
+      inp.dispatchEvent(new Event('input',{bubbles:true}));
+      // Streamlit text_input only "commits" (and triggers a rerun) on Enter
+      // or blur — just setting .value doesn't make the app fetch weather.
+      // Simulate both so the geolocated city loads automatically.
+      inp.focus();
+      inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));
+      setTimeout(function(){ inp.blur(); }, 50);
+      break;
+    }
   }
 }
 function getLocation(){
