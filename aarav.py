@@ -465,7 +465,6 @@ def fetch_weather(city_name, unit):
             f"wind_gusts_10m_max,uv_index_max"
             f"&temperature_unit=fahrenheit&wind_speed_unit=mph&forecast_days=11&past_days=1"
         )
-        )
         wx_f, err = _get_json(forecast_base + "&timezone=auto")
         if wx_f is None and err and "timezone" in err.lower():
             # Open-Meteo has a known bug where timezone=auto 400s for certain
