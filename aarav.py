@@ -659,9 +659,6 @@ def ask_weather_chatbot(user_question, weather_context, chat_history):
 
 
 def render_weather_chatbot(weather_context):
-    st.markdown("---")
-    st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">💬 Ask NimbusAI</p>', unsafe_allow_html=True)
-
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
@@ -2485,7 +2482,8 @@ if fetch_city:
             wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
             temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
         )
-        render_weather_chatbot(weather_context)
+        with st.expander("💬 Ask NimbusAI", expanded=False):
+            render_weather_chatbot(weather_context)
 
         # Share button
         share_text = (f"📍 {city_name}, {country} — {condition_str}\\n"
