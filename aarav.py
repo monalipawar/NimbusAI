@@ -1265,7 +1265,7 @@ def render_severe_weather_map(lat, lon, city_name, code):
       L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap',maxZoom:18}}).addTo(map);
       var circle=L.circle([{lat},{lon}],{{color:'{alert_color}',fillColor:'{alert_color}',fillOpacity:0.15,radius:80000}}).addTo(map);
       var icon=L.divIcon({{html:'<div style="font-size:28px;">{"⚠️" if is_severe else "📍"}</div>',iconSize:[35,35],className:''}});
-      L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b><br>{WMO_CODES.get(code,"")}').openPopup();
+      L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b><br>{WMO_CODES.get(code,"")}');
     </script></div>""", height=310)
     st.markdown(f'<div class="{"warn-box" if is_severe else "info-box"}">{alert_msg}</div>', unsafe_allow_html=True)
 
@@ -1793,7 +1793,7 @@ def render_radar(lat, lon, city_name):
           L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{{z}}/{{x}}/{{y}}.png?appid=demo',{{opacity:0.5}}).addTo(map);
         }});
       var icon=L.divIcon({{html:'<div style="font-size:20px;">📍</div>',iconSize:[24,24],className:''}});
-      L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>').openPopup();
+      L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>');
     }})();
     </script></div>
     <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;text-align:center;">Live radar via RainViewer · Animating last 5 frames</div>
@@ -2618,7 +2618,7 @@ if fetch_city:
           var map=L.map('map',{{zoomControl:true,scrollWheelZoom:false}}).setView([{lat},{lon}],9);
           L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap',maxZoom:18}}).addTo(map);
           var icon=L.divIcon({{html:'<div style="font-size:24px;">📍</div>',iconSize:[30,30],className:''}});
-          L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>').openPopup();
+          L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>');
         </script></div>""", height=270)
 
         # Compare cities
