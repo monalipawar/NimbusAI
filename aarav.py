@@ -41,6 +41,10 @@ SEVERE_MESSAGES = {
 }
 WIND_DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
 
+# The two pages of the app
+PAGE_WEATHER = "🌤️ Weather"
+PAGE_MORE    = "🧰 Tools & Extras"
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CSS & STYLES
@@ -2327,6 +2331,12 @@ if st.session_state.get("_om_key_invalid") and not st.session_state.get("_om_key
         "that secret."
     )
 
+# ── PAGE SWITCHER ─────────────────────────────────────────────────────────────
+# Only the selected page's widgets are rendered, which keeps each page short and
+# also avoids loading maps/charts/API calls for the page you're not looking at.
+page = st.radio("Page", [PAGE_WEATHER, PAGE_MORE], horizontal=True,
+                label_visibility="collapsed", key="page_sel")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN WEATHER DISPLAY
@@ -2424,7 +2434,7 @@ if fetch_city:
         alt_t  = f"/ {to_c(temp_f)}°C"  if unit == "°F" else f"/ {to_f(temp_d)}°F"
         alt_f2 = f"/ {to_c(feels_f)}°C" if unit == "°F" else f"/ {to_f(feels_d)}°F"
 
-        # ── HERO CARD ──────────────────────────────────────────────────────────
+        # ── HERO CARD (shown on both pages) ────────────────────────────────────
         st.markdown(f"""<div class="hero-card main-content">
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
             <span style="font-size:32px;font-weight:800;color:white;letter-spacing:-1px;">{local_now.strftime("%I:%M %p")}</span>
@@ -2452,264 +2462,274 @@ if fetch_city:
                 st.session_state.pop(f"cache_time_{fetch_city.lower()}", None)
                 st.rerun()
 
-        # Severe weather alert
+        # Severe weather alert (also on both pages)
         if code in SEVERE_CODES:
             st.markdown(f'<div class="warn-box"><strong>⚠️ SEVERE WEATHER ALERT</strong><br>{SEVERE_MESSAGES.get(code,"Stay safe!")}</div>', unsafe_allow_html=True)
 
-        # Quick summary cards
-        st.markdown(f'<div class="info-box"><div class="box-title">📅 What Changed Since Yesterday</div>{yesterday_change}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="ai-box"><div class="box-title">🌟 Best Time to Go Outside</div>{best_window_str}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{generate_ai_summary(city_name, temp_f, feels_f, condition_str, humidity, wind_mph, rain_pct, uv, aqi_text, unit, temp_d, feels_d)}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="glass-card"><div class="box-title">🌡️ Why Does It Feel Like That?</div><div style="font-size:14px;color:white;">{feels_like_reason(temp_f, humidity, wind_mph)}</div></div>', unsafe_allow_html=True)
+        # ══════════════════════════════════════════════════════════════════════
+        # PAGE 1 — WEATHER
+        # ══════════════════════════════════════════════════════════════════════
+        if page == PAGE_WEATHER:
 
-        # Tomorrow preview
-        t_icon = WMO_CODES.get(t_code,"🌡️").split()[0]; t_cond_str = WMO_CODES.get(t_code,"Unknown")
-        t_alt_hi = f"/ {to_c(round(t_hi_f))}°C" if unit=="°F" else f"/ {to_f(t_hi_d)}°F"
-        st.markdown(f"""<div class="tomorrow-card">
-          <div class="box-title">📅 Tomorrow's Preview</div>
-          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-            <div style="font-size:40px;">{t_icon}</div>
-            <div>
-              <div style="font-size:16px;font-weight:700;color:white;">{t_cond_str}</div>
-              <div style="font-size:14px;color:rgba(255,255,255,0.75);">High {t_hi_d}{unit} <span style="font-size:12px;opacity:0.6;">{t_alt_hi}</span> · Low {t_lo_d}{unit}</div>
-              <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:4px;">🌧️ {t_rain}% rain chance</div>
-            </div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+            # Quick summary cards
+            st.markdown(f'<div class="info-box"><div class="box-title">📅 What Changed Since Yesterday</div>{yesterday_change}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="ai-box"><div class="box-title">🌟 Best Time to Go Outside</div>{best_window_str}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="ai-box"><div class="box-title">✨ Weather Summary</div>{generate_ai_summary(city_name, temp_f, feels_f, condition_str, humidity, wind_mph, rain_pct, uv, aqi_text, unit, temp_d, feels_d)}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><div class="box-title">🌡️ Why Does It Feel Like That?</div><div style="font-size:14px;color:white;">{feels_like_reason(temp_f, humidity, wind_mph)}</div></div>', unsafe_allow_html=True)
 
-        weather_context = build_weather_context(
-            city_name, country, temp_f, feels_f, condition_str, humidity, wind_mph,
-            wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
-            temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
-        )
-        with st.expander("💬 Ask NimbusAI", expanded=False):
-            render_weather_chatbot(weather_context)
+            # Tomorrow preview
+            t_icon = WMO_CODES.get(t_code,"🌡️").split()[0]; t_cond_str = WMO_CODES.get(t_code,"Unknown")
+            t_alt_hi = f"/ {to_c(round(t_hi_f))}°C" if unit=="°F" else f"/ {to_f(t_hi_d)}°F"
+            st.markdown(f"""<div class="tomorrow-card">
+              <div class="box-title">📅 Tomorrow's Preview</div>
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                <div style="font-size:40px;">{t_icon}</div>
+                <div>
+                  <div style="font-size:16px;font-weight:700;color:white;">{t_cond_str}</div>
+                  <div style="font-size:14px;color:rgba(255,255,255,0.75);">High {t_hi_d}{unit} <span style="font-size:12px;opacity:0.6;">{t_alt_hi}</span> · Low {t_lo_d}{unit}</div>
+                  <div style="font-size:13px;color:rgba(255,255,255,0.65);margin-top:4px;">🌧️ {t_rain}% rain chance</div>
+                </div>
+              </div>
+            </div>""", unsafe_allow_html=True)
 
-        # Share button
-        share_text = (f"📍 {city_name}, {country} — {condition_str}\\n"
-                      f"🌡️ {round(temp_d)}{unit} (feels {round(feels_d)}{unit})\\n"
-                      f"🔴 High {hi_d}{unit}  🔵 Low {lo_d}{unit}\\n"
-                      f"💧 {humidity}% humidity  💨 {round(wind_mph)} mph {wind_dir_str}\\n"
-                      f"🌧️ {rain_pct}% rain  🌞 UV {round(uv)}\\n"
-                      f"Shared via NimbusAI 🌤️")
-        st.markdown(f"""<button onclick="navigator.clipboard.writeText('{share_text}').then(()=>{{this.innerText='✅ Copied!';setTimeout(()=>this.innerText='📋 Share Weather',2000)}})"
-          style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);border-radius:12px;
-                 color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
-                 padding:8px 20px;cursor:pointer;margin-bottom:14px;">📋 Share Weather</button>""", unsafe_allow_html=True)
-
-        # Outfit
-        wear_items = what_to_wear(temp_f, condition_str, wind_mph); svg_fig = outfit_svg(temp_f, condition_str)
-        wc1, wc2 = st.columns([1, 2])
-        with wc1: st.markdown(f'<div class="glass-card" style="text-align:center;padding:12px;"><div class="box-title">👤 Outfit Preview</div>{svg_fig}</div>', unsafe_allow_html=True)
-        with wc2: st.markdown(f'<div class="wear-box"><div class="box-title">👗 What to Wear</div>{"<br>".join(wear_items)}</div>', unsafe_allow_html=True)
-
-        outfit_key = f"{round(temp_f//10)*10}"; saved_outfit = st.session_state.outfit_memory.get(outfit_key)
-        with st.expander("💾 Save Your Own Outfit for This Temperature Range"):
-            outfit_input = st.text_input("What are you wearing today?", value=saved_outfit or "", placeholder="e.g. jeans, hoodie, sneakers", key="outfit_inp")
-            if st.button("Save Outfit"):
-                st.session_state.outfit_memory[outfit_key] = outfit_input
-                st.success(f"✅ Saved for {round(temp_f//10)*10}–{round(temp_f//10)*10+9}°F!")
-        if saved_outfit:
-            st.markdown(f'<div class="glass-card"><div class="box-title">💡 Your Saved Outfit</div><div style="color:white;font-size:14px;">👕 {saved_outfit}</div></div>', unsafe_allow_html=True)
-
-        # Feel-Good Index
-        st.markdown(f"""<div class="glass-card" style="display:flex;align-items:center;gap:20px;">
-          <svg width="80" height="80" viewBox="0 0 80 80">
-            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
-            <circle cx="40" cy="40" r="34" fill="none" stroke="{fgi_col}" stroke-width="8"
-              stroke-dasharray="213.6" stroke-dashoffset="{213.6-(fgi/100)*213.6:.1f}"
-              stroke-linecap="round" transform="rotate(-90 40 40)"/>
-            <text x="40" y="45" text-anchor="middle" font-size="18" font-weight="900" fill="white" font-family="Outfit,sans-serif">{fgi}</text>
-          </svg>
-          <div><div class="box-title">😊 Feel-Good Index</div>
-          <div style="font-size:20px;font-weight:700;color:{fgi_col};">{fgi_lbl}</div>
-          <div class="glass-sub">Temp 50% · Humidity 30% · Wind 20%</div></div>
-        </div>""", unsafe_allow_html=True)
-
-        # Humidity comfort
-        hum_msg, hum_col = humidity_comfort(humidity)
-        st.markdown(f'<div class="glass-card"><div class="box-title">💧 Humidity Comfort</div><div style="font-size:14px;color:{hum_col};">{hum_msg}</div><div class="glass-sub">{humidity}% relative humidity</div></div>', unsafe_allow_html=True)
-
-        # Stats row
-        vis_str = f"{vis_km} km" if vis_km is not None else "N/A"
-        c1, c2, c3, c4 = st.columns(4)
-        for col_w, (ico, lbl, val, sub) in zip([c1,c2,c3,c4], [
-            ("💧","Humidity",  f"{humidity}%",          ""),
-            ("💨","Wind",      f"{round(wind_mph)} mph", f"{wind_dir_str} · Gusts {round(gusts_mph)} mph"),
-            ("🌧️","Rain",      f"{rain_pct}%",          "chance today"),
-            ("👁️","Visibility",vis_str,                 ""),
-        ]):
-            with col_w: st.markdown(f'<div class="glass-card"><div class="glass-label">{ico} {lbl}</div><div class="glass-value" style="font-size:18px;">{val}</div><div class="glass-sub">{sub}</div></div>', unsafe_allow_html=True)
-
-        c5, c6 = st.columns(2)
-        with c5: st.markdown(f'<div class="glass-card"><div class="glass-label">🌞 UV Index</div><div class="glass-value">{round(uv)}</div><div class="glass-sub">out of 11</div></div>', unsafe_allow_html=True)
-        with c6: st.markdown(f'<div class="glass-card"><div class="glass-label">🌬️ Wind Direction</div><div class="glass-value">{wind_dir_str}</div><div class="glass-sub">{round(wind_deg or 0)}°</div></div>', unsafe_allow_html=True)
-
-        # Pollen
-        st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
-          <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌾 Grass Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(grass_pollen,"grass")}</div></div>
-          <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌳 Tree Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(tree_pollen,"tree")}</div></div>
-        </div>""", unsafe_allow_html=True)
-
-        # 5-day forecast
-        st.markdown('<p style="color:white;font-weight:700;font-size:14px;margin:10px 0 8px;">📅 5-DAY FORECAST</p>', unsafe_allow_html=True)
-        fc = '<div class="forecast-row">'
-        for i in range(5):
-            idx = i + 1
-            dn = "Today" if i == 0 else datetime.strptime(daily_f["time"][idx],"%Y-%m-%d").strftime("%a")
-            di = WMO_CODES.get(daily_f["weather_code"][idx],"🌡️").split()[0]
-            dh = round(daily_d["temperature_2m_max"][idx]); dl = round(daily_d["temperature_2m_min"][idx])
-            dhf = round(daily_f["temperature_2m_max"][idx]); dlf = round(daily_f["temperature_2m_min"][idx])
-            au = "°C" if unit=="°F" else "°F"; dha = to_c(dhf) if unit=="°F" else to_f(dh); dla = to_c(dlf) if unit=="°F" else to_f(dl)
-            fc += f'<div class="forecast-day"><div class="day-name">{dn}</div><div class="day-icon">{di}</div><div class="day-hi">{dh}{unit}</div><div class="day-lo">{dl}{unit}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">{dha}/{dla}{au}</div></div>'
-        st.markdown(fc + "</div>", unsafe_allow_html=True)
-
-        # Weekly trend sparkline
-        trend_up = week_hi_f[-1] > week_hi_f[0]
-        trend_label = "📈 Warming trend this week" if trend_up else "📉 Cooling trend this week"
-        spark_color = "#f87171" if trend_up else "#60a5fa"
-        st.markdown(f'<div class="glass-card"><div class="box-title">📊 Weekly High Temperature Trend</div>{make_sparkline(week_hi_d, spark_color)}<div class="glass-sub" style="margin-top:6px;">{trend_label}</div></div>', unsafe_allow_html=True)
-
-        # Sun arc + sunrise/sunset
-        st.markdown(make_sun_arc(local_now, sr_fmt, ss_fmt), unsafe_allow_html=True)
-        st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
-          <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌅 Sunrise</div><div class="glass-value">{sr_fmt}</div></div>
-          <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌇 Sunset</div><div class="glass-value">{ss_fmt}</div></div>
-        </div>""", unsafe_allow_html=True)
-
-        # Hourly charts
-        for chart, title in [
-            (make_chart(hourly_temps_d,"white","ag","rgba(255,255,255,0.25)",unit,now_h,hour_labels,highlight_i=best_i), "🌡️ Hourly Temperature ★ shaded = best outdoor window"),
-            (make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels), "🥵 Hourly Feels Like"),
-            (make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100), "🌧️ Hourly Rain Probability"),
-            (make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels), "💨 Hourly Wind Speed"),
-        ]:
-            components.html(
-                f'<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style>'
-                f'<div class="gc"><div class="bt">{title}</div>{chart}</div>',
-                height=210, scrolling=False
+            weather_context = build_weather_context(
+                city_name, country, temp_f, feels_f, condition_str, humidity, wind_mph,
+                wind_dir_str, rain_pct, uv, aqi_text, sr_fmt, ss_fmt, unit,
+                temp_d, feels_d, hi_d, lo_d, t_hi_d, t_lo_d, t_cond_str
             )
+            with st.expander("💬 Ask NimbusAI", expanded=False):
+                render_weather_chatbot(weather_context)
 
-        # Moon + AQI
-        pm_text = f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
-        st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
-          <div class="glass-card" style="flex:1;text-align:center;">
-            <div class="glass-label">🌙 Moon Phase</div>
-            <div style="font-size:36px;margin:4px 0;">{moon_icon}</div>
-            <div class="glass-value" style="font-size:16px;">{moon_name}</div>
-          </div>
-          <div class="glass-card" style="flex:1;text-align:center;">
-            <div class="glass-label">💨 Air Quality (AQI)</div>
-            <div class="glass-value" style="color:{aqi_color};font-size:20px;margin:6px 0;">{aqi_text}</div>
-            <div class="glass-sub">PM2.5: {pm_text}</div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+            # Share button
+            share_text = (f"📍 {city_name}, {country} — {condition_str}\\n"
+                          f"🌡️ {round(temp_d)}{unit} (feels {round(feels_d)}{unit})\\n"
+                          f"🔴 High {hi_d}{unit}  🔵 Low {lo_d}{unit}\\n"
+                          f"💧 {humidity}% humidity  💨 {round(wind_mph)} mph {wind_dir_str}\\n"
+                          f"🌧️ {rain_pct}% rain  🌞 UV {round(uv)}\\n"
+                          f"Shared via NimbusAI 🌤️")
+            st.markdown(f"""<button onclick="navigator.clipboard.writeText('{share_text}').then(()=>{{this.innerText='✅ Copied!';setTimeout(()=>this.innerText='📋 Share Weather',2000)}})"
+              style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);border-radius:12px;
+                     color:white;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;
+                     padding:8px 20px;cursor:pointer;margin-bottom:14px;">📋 Share Weather</button>""", unsafe_allow_html=True)
 
-        # Map
-        st.markdown('<div class="box-title" style="color:rgba(255,255,255,0.6);margin-bottom:6px;">🗺️ WEATHER MAP</div>', unsafe_allow_html=True)
-        components.html(f"""
-        <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.25);margin-bottom:12px;">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <div id="map" style="height:260px;width:100%;"></div>
-        <script>
-          var map=L.map('map',{{zoomControl:true,scrollWheelZoom:false}}).setView([{lat},{lon}],9);
-          L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap',maxZoom:18}}).addTo(map);
-          var icon=L.divIcon({{html:'<div style="font-size:24px;">📍</div>',iconSize:[30,30],className:''}});
-          L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>');
-        </script></div>""", height=270)
+            # Outfit
+            wear_items = what_to_wear(temp_f, condition_str, wind_mph); svg_fig = outfit_svg(temp_f, condition_str)
+            wc1, wc2 = st.columns([1, 2])
+            with wc1: st.markdown(f'<div class="glass-card" style="text-align:center;padding:12px;"><div class="box-title">👤 Outfit Preview</div>{svg_fig}</div>', unsafe_allow_html=True)
+            with wc2: st.markdown(f'<div class="wear-box"><div class="box-title">👗 What to Wear</div>{"<br>".join(wear_items)}</div>', unsafe_allow_html=True)
 
-        # Compare cities
-        st.markdown("---")
-        st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🆚 Compare With Another City</p>', unsafe_allow_html=True)
-        compare_input = st.text_input("", placeholder="Enter another city to compare...", label_visibility="collapsed", key="compare_inp")
-        if compare_input.strip():
-            with st.spinner("Fetching comparison..."):
-                res2 = fetch_weather(compare_input.strip(), unit)
-                if res2[0] is None:
-                    st.warning("⚠️ Comparison city not found.")
-                else:
-                    wx2_f, wx2_d, _, meta2 = res2
-                    cur2_f = wx2_f["current"]; cur2_d = wx2_d["current"]
-                    t2 = cur2_f["temperature_2m"]; t2_d = cur2_d["temperature_2m"]
-                    w2 = cur2_f["wind_speed_10m"]; r2 = cur2_f.get("precipitation_probability",0)
-                    h2 = cur2_f["relative_humidity_2m"]; c2_code = cur2_f["weather_code"]
-                    fgi2, fgi2_lbl, fgi2_col = feel_good_index(t2, h2, w2)
-                    alt2 = f"/ {to_c(t2)}°C" if unit=="°F" else f"/ {to_f(t2_d)}°F"
-                    ca, cb = st.columns(2)
-                    with ca:
-                        st.markdown(f"""<div class="compare-col">
-                          <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {city_name}</div>
-                          <div style="font-size:32px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
-                          <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt_t}</div>
-                          <div style="font-size:13px;color:white;margin-top:6px;">{condition_str}</div>
-                          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{humidity}% &nbsp;💨{round(wind_mph)}mph &nbsp;🌧️{rain_pct}%</div>
-                          <div style="font-size:12px;color:{fgi_col};margin-top:4px;">😊 {fgi}/100 — {fgi_lbl}</div>
-                        </div>""", unsafe_allow_html=True)
-                    with cb:
-                        st.markdown(f"""<div class="compare-col">
-                          <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {meta2['name']}, {meta2['country']}</div>
-                          <div style="font-size:32px;font-weight:900;color:white;">{round(t2_d)}{unit}</div>
-                          <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt2}</div>
-                          <div style="font-size:13px;color:white;margin-top:6px;">{WMO_CODES.get(c2_code,'Unknown')}</div>
-                          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{h2}% &nbsp;💨{round(w2)}mph &nbsp;🌧️{r2}%</div>
-                          <div style="font-size:12px;color:{fgi2_col};margin-top:4px;">😊 {fgi2}/100 — {fgi2_lbl}</div>
-                        </div>""", unsafe_allow_html=True)
-                    winner = f"🏆 {city_name} has better weather!" if fgi > fgi2 else (f"🏆 {meta2['name']} has better weather!" if fgi2 > fgi else "🤝 Both cities feel about the same!")
-                    st.markdown(f'<div class="ai-box" style="margin-top:8px;">{winner}</div>', unsafe_allow_html=True)
+            outfit_key = f"{round(temp_f//10)*10}"; saved_outfit = st.session_state.outfit_memory.get(outfit_key)
+            with st.expander("💾 Save Your Own Outfit for This Temperature Range"):
+                outfit_input = st.text_input("What are you wearing today?", value=saved_outfit or "", placeholder="e.g. jeans, hoodie, sneakers", key="outfit_inp")
+                if st.button("Save Outfit"):
+                    st.session_state.outfit_memory[outfit_key] = outfit_input
+                    st.success(f"✅ Saved for {round(temp_f//10)*10}–{round(temp_f//10)*10+9}°F!")
+            if saved_outfit:
+                st.markdown(f'<div class="glass-card"><div class="box-title">💡 Your Saved Outfit</div><div style="color:white;font-size:14px;">👕 {saved_outfit}</div></div>', unsafe_allow_html=True)
 
-        st.markdown('<p class="footer">Open-Meteo API · Air Quality API · OpenStreetMap · No API keys needed 😄</p>', unsafe_allow_html=True)
+            # Feel-Good Index
+            st.markdown(f"""<div class="glass-card" style="display:flex;align-items:center;gap:20px;">
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
+                <circle cx="40" cy="40" r="34" fill="none" stroke="{fgi_col}" stroke-width="8"
+                  stroke-dasharray="213.6" stroke-dashoffset="{213.6-(fgi/100)*213.6:.1f}"
+                  stroke-linecap="round" transform="rotate(-90 40 40)"/>
+                <text x="40" y="45" text-anchor="middle" font-size="18" font-weight="900" fill="white" font-family="Outfit,sans-serif">{fgi}</text>
+              </svg>
+              <div><div class="box-title">😊 Feel-Good Index</div>
+              <div style="font-size:20px;font-weight:700;color:{fgi_col};">{fgi_lbl}</div>
+              <div class="glass-sub">Temp 50% · Humidity 30% · Wind 20%</div></div>
+            </div>""", unsafe_allow_html=True)
 
-        # ── All feature blocks ─────────────────────────────────────────────────
-        render_rain_countdown(hourly_rain_vals, hour_labels, now_h)
-        activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition_str)
-        render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d)
-        render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h)
-        render_music_mood(condition_str, temp_f, fgi)
-        render_weather_photo(condition_str, city_name)
-        render_aqi_health(aqi_text, pm25)
-        render_historical(lat, lon, unit)
-        render_severe_weather_map(lat, lon, city_name, code)
-        render_trip_planner()
-        render_packing_list()
-        render_weather_diary(city_name, temp_d, unit, condition_str)
-        render_multi_city_dashboard(unit)
-        st.markdown(wind_compass_svg(wind_deg, wind_mph, wind_dir_str), unsafe_allow_html=True)
-        render_radar(lat, lon, city_name)
-        render_uv_timeline(hourly_uv_today, hour_labels, now_h)
-        render_30day_history(lat, lon, unit)
-        render_change_detector(temp_f, hi_f_val, lo_f_val, yest_hi_f, yest_lo_f, feels_f, wind_mph, condition_str, unit)
-        render_golden_hour(sr_fmt, ss_fmt, local_now)
-        render_pollen_tracker(grass_pollen, tree_pollen)
-        render_commute_advisor(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit)
-        render_weekend_scorer(daily_f, daily_d, unit)
-        render_tweet_copy(city_name, temp_d, unit, condition_str, hi_d, lo_d, fgi, fgi_lbl)
-        render_friends_weather(unit)
-        render_time_capsule(city_name, temp_d, unit, condition_str, fgi)
-        render_sleep_forecast(hourly_temps_f, hourly_wind, hour_labels)
-        render_gardening_advisor(temp_f, humidity, rain_pct, wind_mph, uv, t_rain)
-        render_running_advisor(temp_f, humidity, wind_mph, aqi_text, unit, temp_d)
-        render_windows_advisor(temp_f, aqi_text, grass_pollen, tree_pollen, wind_mph, condition_str)
-        render_allergy_alert(grass_pollen, tree_pollen, aqi_text, wind_mph)
-        render_best_day(daily_f, daily_d, unit)
-        render_confidence_badges(daily_f)
-        render_dew_point(temp_f, humidity, unit)
-        st.markdown(visibility_gauge_svg(vis_km), unsafe_allow_html=True)
-        render_currency_weather(unit)
-        render_qr_code(city_name)
-        render_print_report(city_name, country, temp_d, unit, condition_str,
-                            hi_d, lo_d, humidity, wind_mph, wind_dir_str,
-                            rain_pct, uv, aqi_text, sr_fmt, ss_fmt, fgi, fgi_lbl)
+            # Humidity comfort
+            hum_msg, hum_col = humidity_comfort(humidity)
+            st.markdown(f'<div class="glass-card"><div class="box-title">💧 Humidity Comfort</div><div style="font-size:14px;color:{hum_col};">{hum_msg}</div><div class="glass-sub">{humidity}% relative humidity</div></div>', unsafe_allow_html=True)
 
-        # Thermometer + Feels comparison side by side
-        bc1, bc2 = st.columns([1, 2])
-        with bc1: st.markdown(thermometer_svg(temp_f, unit, temp_d), unsafe_allow_html=True)
-        with bc2: render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit)
+            # Stats row
+            vis_str = f"{vis_km} km" if vis_km is not None else "N/A"
+            c1, c2, c3, c4 = st.columns(4)
+            for col_w, (ico, lbl, val, sub) in zip([c1,c2,c3,c4], [
+                ("💧","Humidity",  f"{humidity}%",          ""),
+                ("💨","Wind",      f"{round(wind_mph)} mph", f"{wind_dir_str} · Gusts {round(gusts_mph)} mph"),
+                ("🌧️","Rain",      f"{rain_pct}%",          "chance today"),
+                ("👁️","Visibility",vis_str,                 ""),
+            ]):
+                with col_w: st.markdown(f'<div class="glass-card"><div class="glass-label">{ico} {lbl}</div><div class="glass-value" style="font-size:18px;">{val}</div><div class="glass-sub">{sub}</div></div>', unsafe_allow_html=True)
 
-        render_day_progress(local_now, sr_fmt, ss_fmt)
-        render_wind_detail(wind_mph, gusts_mph, wind_dir_str)
+            c5, c6 = st.columns(2)
+            with c5: st.markdown(f'<div class="glass-card"><div class="glass-label">🌞 UV Index</div><div class="glass-value">{round(uv)}</div><div class="glass-sub">out of 11</div></div>', unsafe_allow_html=True)
+            with c6: st.markdown(f'<div class="glass-card"><div class="glass-label">🌬️ Wind Direction</div><div class="glass-value">{wind_dir_str}</div><div class="glass-sub">{round(wind_deg or 0)}°</div></div>', unsafe_allow_html=True)
 
-        # Auto-refresh countdown
+            # Pollen
+            st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
+              <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌾 Grass Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(grass_pollen,"grass")}</div></div>
+              <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌳 Tree Pollen</div><div class="glass-value" style="font-size:15px;">{pollen_label(tree_pollen,"tree")}</div></div>
+            </div>""", unsafe_allow_html=True)
+
+            # 5-day forecast
+            st.markdown('<p style="color:white;font-weight:700;font-size:14px;margin:10px 0 8px;">📅 5-DAY FORECAST</p>', unsafe_allow_html=True)
+            fc = '<div class="forecast-row">'
+            for i in range(5):
+                idx = i + 1
+                dn = "Today" if i == 0 else datetime.strptime(daily_f["time"][idx],"%Y-%m-%d").strftime("%a")
+                di = WMO_CODES.get(daily_f["weather_code"][idx],"🌡️").split()[0]
+                dh = round(daily_d["temperature_2m_max"][idx]); dl = round(daily_d["temperature_2m_min"][idx])
+                dhf = round(daily_f["temperature_2m_max"][idx]); dlf = round(daily_f["temperature_2m_min"][idx])
+                au = "°C" if unit=="°F" else "°F"; dha = to_c(dhf) if unit=="°F" else to_f(dh); dla = to_c(dlf) if unit=="°F" else to_f(dl)
+                fc += f'<div class="forecast-day"><div class="day-name">{dn}</div><div class="day-icon">{di}</div><div class="day-hi">{dh}{unit}</div><div class="day-lo">{dl}{unit}</div><div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">{dha}/{dla}{au}</div></div>'
+            st.markdown(fc + "</div>", unsafe_allow_html=True)
+
+            # Weekly trend sparkline
+            trend_up = week_hi_f[-1] > week_hi_f[0]
+            trend_label = "📈 Warming trend this week" if trend_up else "📉 Cooling trend this week"
+            spark_color = "#f87171" if trend_up else "#60a5fa"
+            st.markdown(f'<div class="glass-card"><div class="box-title">📊 Weekly High Temperature Trend</div>{make_sparkline(week_hi_d, spark_color)}<div class="glass-sub" style="margin-top:6px;">{trend_label}</div></div>', unsafe_allow_html=True)
+
+            # Sun arc + sunrise/sunset
+            st.markdown(make_sun_arc(local_now, sr_fmt, ss_fmt), unsafe_allow_html=True)
+            st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
+              <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌅 Sunrise</div><div class="glass-value">{sr_fmt}</div></div>
+              <div class="glass-card" style="flex:1;text-align:center;"><div class="glass-label">🌇 Sunset</div><div class="glass-value">{ss_fmt}</div></div>
+            </div>""", unsafe_allow_html=True)
+
+            # Hourly charts
+            for chart, title in [
+                (make_chart(hourly_temps_d,"white","ag","rgba(255,255,255,0.25)",unit,now_h,hour_labels,highlight_i=best_i), "🌡️ Hourly Temperature ★ shaded = best outdoor window"),
+                (make_chart(hourly_feels_d,"rgba(255,200,100,0.9)","flg","rgba(255,180,60,0.3)",unit,now_h,hour_labels), "🥵 Hourly Feels Like"),
+                (make_chart(hourly_rain_vals,"rgba(150,210,255,0.9)","rg","rgba(100,180,255,0.4)","%",now_h,hour_labels,fixed_min=0,fixed_max=100), "🌧️ Hourly Rain Probability"),
+                (make_chart(hourly_wind,"rgba(200,240,200,0.9)","wg","rgba(150,220,150,0.3)"," mph",now_h,hour_labels), "💨 Hourly Wind Speed"),
+            ]:
+                components.html(
+                    f'<style>body{{margin:0;background:transparent;}}.gc{{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:14px 10px 8px;backdrop-filter:blur(8px);}}.bt{{font-size:10px;letter-spacing:1.4px;color:rgba(255,255,255,0.6);font-weight:700;margin-bottom:8px;text-transform:uppercase;font-family:Outfit,sans-serif;}}</style>'
+                    f'<div class="gc"><div class="bt">{title}</div>{chart}</div>',
+                    height=210, scrolling=False
+                )
+
+            # Moon + AQI
+            pm_text = f"{pm25:.1f} µg/m³" if pm25 is not None else "N/A"
+            st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px;">
+              <div class="glass-card" style="flex:1;text-align:center;">
+                <div class="glass-label">🌙 Moon Phase</div>
+                <div style="font-size:36px;margin:4px 0;">{moon_icon}</div>
+                <div class="glass-value" style="font-size:16px;">{moon_name}</div>
+              </div>
+              <div class="glass-card" style="flex:1;text-align:center;">
+                <div class="glass-label">💨 Air Quality (AQI)</div>
+                <div class="glass-value" style="color:{aqi_color};font-size:20px;margin:6px 0;">{aqi_text}</div>
+                <div class="glass-sub">PM2.5: {pm_text}</div>
+              </div>
+            </div>""", unsafe_allow_html=True)
+
+            # Map
+            st.markdown('<div class="box-title" style="color:rgba(255,255,255,0.6);margin-bottom:6px;">🗺️ WEATHER MAP</div>', unsafe_allow_html=True)
+            components.html(f"""
+            <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.25);margin-bottom:12px;">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <div id="map" style="height:260px;width:100%;"></div>
+            <script>
+              var map=L.map('map',{{zoomControl:true,scrollWheelZoom:false}}).setView([{lat},{lon}],9);
+              L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap',maxZoom:18}}).addTo(map);
+              var icon=L.divIcon({{html:'<div style="font-size:24px;">📍</div>',iconSize:[30,30],className:''}});
+              L.marker([{lat},{lon}],{{icon:icon}}).addTo(map).bindPopup('<b>{city_name}</b>');
+            </script></div>""", height=270)
+
+            # Core live-weather widgets that belong with the main view
+            render_rain_countdown(hourly_rain_vals, hour_labels, now_h)
+            render_radar(lat, lon, city_name)
+            render_uv_timeline(hourly_uv_today, hour_labels, now_h)
+
+            # Compare cities
+            st.markdown("---")
+            st.markdown('<p style="color:white;font-weight:700;font-size:16px;margin-bottom:8px;">🆚 Compare With Another City</p>', unsafe_allow_html=True)
+            compare_input = st.text_input("", placeholder="Enter another city to compare...", label_visibility="collapsed", key="compare_inp")
+            if compare_input.strip():
+                with st.spinner("Fetching comparison..."):
+                    res2 = fetch_weather(compare_input.strip(), unit)
+                    if res2[0] is None:
+                        st.warning("⚠️ Comparison city not found.")
+                    else:
+                        wx2_f, wx2_d, _, meta2 = res2
+                        cur2_f = wx2_f["current"]; cur2_d = wx2_d["current"]
+                        t2 = cur2_f["temperature_2m"]; t2_d = cur2_d["temperature_2m"]
+                        w2 = cur2_f["wind_speed_10m"]; r2 = cur2_f.get("precipitation_probability",0)
+                        h2 = cur2_f["relative_humidity_2m"]; c2_code = cur2_f["weather_code"]
+                        fgi2, fgi2_lbl, fgi2_col = feel_good_index(t2, h2, w2)
+                        alt2 = f"/ {to_c(t2)}°C" if unit=="°F" else f"/ {to_f(t2_d)}°F"
+                        ca, cb = st.columns(2)
+                        with ca:
+                            st.markdown(f"""<div class="compare-col">
+                              <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {city_name}</div>
+                              <div style="font-size:32px;font-weight:900;color:white;">{round(temp_d)}{unit}</div>
+                              <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt_t}</div>
+                              <div style="font-size:13px;color:white;margin-top:6px;">{condition_str}</div>
+                              <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{humidity}% &nbsp;💨{round(wind_mph)}mph &nbsp;🌧️{rain_pct}%</div>
+                              <div style="font-size:12px;color:{fgi_col};margin-top:4px;">😊 {fgi}/100 — {fgi_lbl}</div>
+                            </div>""", unsafe_allow_html=True)
+                        with cb:
+                            st.markdown(f"""<div class="compare-col">
+                              <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:8px;">📍 {meta2['name']}, {meta2['country']}</div>
+                              <div style="font-size:32px;font-weight:900;color:white;">{round(t2_d)}{unit}</div>
+                              <div style="font-size:12px;color:rgba(255,255,255,0.6);">{alt2}</div>
+                              <div style="font-size:13px;color:white;margin-top:6px;">{WMO_CODES.get(c2_code,'Unknown')}</div>
+                              <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">💧{h2}% &nbsp;💨{round(w2)}mph &nbsp;🌧️{r2}%</div>
+                              <div style="font-size:12px;color:{fgi2_col};margin-top:4px;">😊 {fgi2}/100 — {fgi2_lbl}</div>
+                            </div>""", unsafe_allow_html=True)
+                        winner = f"🏆 {city_name} has better weather!" if fgi > fgi2 else (f"🏆 {meta2['name']} has better weather!" if fgi2 > fgi else "🤝 Both cities feel about the same!")
+                        st.markdown(f'<div class="ai-box" style="margin-top:8px;">{winner}</div>', unsafe_allow_html=True)
+
+            st.markdown('<p class="footer">Open-Meteo API · Air Quality API · OpenStreetMap · No API keys needed 😄</p>', unsafe_allow_html=True)
+
+        # ══════════════════════════════════════════════════════════════════════
+        # PAGE 2 — TOOLS & EXTRAS
+        # ══════════════════════════════════════════════════════════════════════
+        else:
+            activity_scores(temp_f, humidity, wind_mph, rain_pct, uv, condition_str)
+            render_stats_summary(temp_f, humidity, wind_mph, uv, rain_pct, aqi_text, fgi, unit, temp_d, feels_d)
+            render_hourly_table(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit, now_h)
+            render_music_mood(condition_str, temp_f, fgi)
+            render_weather_photo(condition_str, city_name)
+            render_aqi_health(aqi_text, pm25)
+            render_historical(lat, lon, unit)
+            render_severe_weather_map(lat, lon, city_name, code)
+            render_trip_planner()
+            render_packing_list()
+            render_weather_diary(city_name, temp_d, unit, condition_str)
+            render_multi_city_dashboard(unit)
+            st.markdown(wind_compass_svg(wind_deg, wind_mph, wind_dir_str), unsafe_allow_html=True)
+            render_30day_history(lat, lon, unit)
+            render_change_detector(temp_f, hi_f_val, lo_f_val, yest_hi_f, yest_lo_f, feels_f, wind_mph, condition_str, unit)
+            render_golden_hour(sr_fmt, ss_fmt, local_now)
+            render_pollen_tracker(grass_pollen, tree_pollen)
+            render_commute_advisor(hourly_temps_d, hourly_feels_d, hourly_rain_vals, hourly_wind, hour_labels, unit)
+            render_weekend_scorer(daily_f, daily_d, unit)
+            render_tweet_copy(city_name, temp_d, unit, condition_str, hi_d, lo_d, fgi, fgi_lbl)
+            render_friends_weather(unit)
+            render_time_capsule(city_name, temp_d, unit, condition_str, fgi)
+            render_sleep_forecast(hourly_temps_f, hourly_wind, hour_labels)
+            render_gardening_advisor(temp_f, humidity, rain_pct, wind_mph, uv, t_rain)
+            render_running_advisor(temp_f, humidity, wind_mph, aqi_text, unit, temp_d)
+            render_windows_advisor(temp_f, aqi_text, grass_pollen, tree_pollen, wind_mph, condition_str)
+            render_allergy_alert(grass_pollen, tree_pollen, aqi_text, wind_mph)
+            render_best_day(daily_f, daily_d, unit)
+            render_confidence_badges(daily_f)
+            render_dew_point(temp_f, humidity, unit)
+            st.markdown(visibility_gauge_svg(vis_km), unsafe_allow_html=True)
+            render_currency_weather(unit)
+            render_qr_code(city_name)
+            render_print_report(city_name, country, temp_d, unit, condition_str,
+                                hi_d, lo_d, humidity, wind_mph, wind_dir_str,
+                                rain_pct, uv, aqi_text, sr_fmt, ss_fmt, fgi, fgi_lbl)
+
+            # Thermometer + Feels comparison side by side
+            bc1, bc2 = st.columns([1, 2])
+            with bc1: st.markdown(thermometer_svg(temp_f, unit, temp_d), unsafe_allow_html=True)
+            with bc2: render_feels_comparison(temp_f, feels_f, temp_d, feels_d, humidity, wind_mph, unit)
+
+            render_day_progress(local_now, sr_fmt, ss_fmt)
+            render_wind_detail(wind_mph, gusts_mph, wind_dir_str)
+
+        # Auto-refresh countdown (runs on both pages)
         if "last_fetch_time" not in st.session_state:
             st.session_state.last_fetch_time = datetime.now()
         elapsed = (datetime.now() - st.session_state.last_fetch_time).total_seconds()
@@ -2720,46 +2740,57 @@ if fetch_city:
             remaining = max(0, 1800 - int(elapsed))
             st.markdown(f'<div style="font-size:10px;color:rgba(255,255,255,0.3);text-align:right;margin-bottom:4px;">🔄 Auto-refresh in {remaining//60}m {remaining%60:02d}s</div>', unsafe_allow_html=True)
 
-# ── Weather Game ───────────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">🎮 Play Weather Game?</p>', unsafe_allow_html=True)
-play_game = st.radio("", ["Yes, play!", "No thanks"], horizontal=True, label_visibility="collapsed", key="game_radio")
 
-if play_game == "Yes, play!":
-    weather_options = [("☀️","Sunny"),("🌧️","Rainy"),("❄️","Snowy"),("⛈️","Stormy")]
-    if "game_weather" not in st.session_state:
-        st.session_state.game_weather = random.choice(weather_options)
-    emoji_g, answer_g = st.session_state.game_weather
-    st.markdown(f"""<div style="text-align:center;padding:30px;border-radius:20px;background:rgba(255,255,255,0.08);margin:10px 0;">
-        <div style="font-size:90px;">{emoji_g}</div>
-        <div style="color:rgba(255,255,255,0.7);font-size:14px;margin-top:8px;">Guess the weather condition!</div>
-    </div>""", unsafe_allow_html=True)
-    guess_g = st.radio("Your guess:", ["Sunny","Rainy","Snowy","Stormy"], horizontal=True, key="game_guess")
-    gc1, gc2 = st.columns(2)
-    with gc1:
-        if st.button("🎯 Submit Guess", key="game_submit"):
-            if guess_g == answer_g: st.success("🎉 Correct! Well done!")
-            else: st.error(f"❌ Wrong! It was {answer_g}")
-    with gc2:
-        if st.button("🔄 New Round", key="game_new"):
-            st.session_state.game_weather = random.choice(weather_options); st.rerun()
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAGE-LEVEL EXTRAS (outside the weather fetch, so they work without a city)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Logo Maker ────────────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">🎨 Quick Logo Creator</p>', unsafe_allow_html=True)
-logo_text  = st.text_input("Business/App Name", placeholder="NimbusAI", key="logo_text_input")
-logo_color = st.color_picker("Pick Logo Color", "#38b6ff", key="logo_color_picker")
-logo_emoji = st.selectbox("Choose Logo Emoji",
-    ["⚡","🚀","🌟","🔥","💎","🎯","🌊","🍀","🦋","🐉","🌈","🏆","💡","🎨","🔮","🦅","🌙","☀️","❄️","🎵","None"],
-    key="logo_emoji_selectbox")
-if logo_text:
-    prefix = "" if logo_emoji == "None" else f"{logo_emoji} "
-    st.markdown(f"""<div style="background:rgba(255,255,255,0.1);padding:40px;border-radius:20px;text-align:center;
-        margin-top:15px;border:1px solid rgba(255,255,255,0.2);">
-        <div style="font-size:48px;font-weight:900;color:{logo_color};letter-spacing:2px;">{prefix}{logo_text}</div>
-    </div>""", unsafe_allow_html=True)
+if page == PAGE_WEATHER:
+    if not fetch_city:
+        st.markdown('<div class="info-box">🔎 Search for a city above to see the weather.</div>', unsafe_allow_html=True)
+    # Favourites live on page 1 so the 1/2/3 keyboard shortcuts work next to the weather
+    render_favourites()
 
-# ── Favourites + PWA + keyboard shortcuts ──────────────────────────────────────
-render_favourites()
+else:
+    # ── Weather Game ───────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">🎮 Play Weather Game?</p>', unsafe_allow_html=True)
+    play_game = st.radio("", ["Yes, play!", "No thanks"], horizontal=True, label_visibility="collapsed", key="game_radio")
+
+    if play_game == "Yes, play!":
+        weather_options = [("☀️","Sunny"),("🌧️","Rainy"),("❄️","Snowy"),("⛈️","Stormy")]
+        if "game_weather" not in st.session_state:
+            st.session_state.game_weather = random.choice(weather_options)
+        emoji_g, answer_g = st.session_state.game_weather
+        st.markdown(f"""<div style="text-align:center;padding:30px;border-radius:20px;background:rgba(255,255,255,0.08);margin:10px 0;">
+            <div style="font-size:90px;">{emoji_g}</div>
+            <div style="color:rgba(255,255,255,0.7);font-size:14px;margin-top:8px;">Guess the weather condition!</div>
+        </div>""", unsafe_allow_html=True)
+        guess_g = st.radio("Your guess:", ["Sunny","Rainy","Snowy","Stormy"], horizontal=True, key="game_guess")
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            if st.button("🎯 Submit Guess", key="game_submit"):
+                if guess_g == answer_g: st.success("🎉 Correct! Well done!")
+                else: st.error(f"❌ Wrong! It was {answer_g}")
+        with gc2:
+            if st.button("🔄 New Round", key="game_new"):
+                st.session_state.game_weather = random.choice(weather_options); st.rerun()
+
+    # ── Logo Maker ─────────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown('<p style="color:white;font-weight:700;font-size:18px;margin-bottom:8px;">🎨 Quick Logo Creator</p>', unsafe_allow_html=True)
+    logo_text  = st.text_input("Business/App Name", placeholder="NimbusAI", key="logo_text_input")
+    logo_color = st.color_picker("Pick Logo Color", "#38b6ff", key="logo_color_picker")
+    logo_emoji = st.selectbox("Choose Logo Emoji",
+        ["⚡","🚀","🌟","🔥","💎","🎯","🌊","🍀","🦋","🐉","🌈","🏆","💡","🎨","🔮","🦅","🌙","☀️","❄️","🎵","None"],
+        key="logo_emoji_selectbox")
+    if logo_text:
+        prefix = "" if logo_emoji == "None" else f"{logo_emoji} "
+        st.markdown(f"""<div style="background:rgba(255,255,255,0.1);padding:40px;border-radius:20px;text-align:center;
+            margin-top:15px;border:1px solid rgba(255,255,255,0.2);">
+            <div style="font-size:48px;font-weight:900;color:{logo_color};letter-spacing:2px;">{prefix}{logo_text}</div>
+        </div>""", unsafe_allow_html=True)
+
+# ── PWA + keyboard shortcuts ───────────────────────────────────────────────────
 inject_pwa()
 components.html(KEYBOARD_JS, height=0, scrolling=False)
